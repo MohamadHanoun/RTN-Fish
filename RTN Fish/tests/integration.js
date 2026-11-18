@@ -46,6 +46,10 @@ async function main(){
   assert.equal(r.ok,true);const code=r.code;
   assert.equal(a.room.settings.mode,'gaming');
   r=await b.send('joinRoom',{name:'رامي',code});assert.equal(r.ok,true);
+  await sleep(60);
+  assert(a.room.players.every(p=>p.avatar),'every player gets an animal avatar');
+  assert.equal(new Set(a.room.players.map(p=>p.avatar)).size,a.room.players.length,'animal avatars are unique within a room');
+  const initialAvatars=new Map(a.room.players.map(p=>[p.id,p.avatar]));
   r=await b.send('updateSettings',{hearts:8});assert.equal(r.ok,false,'guest cannot edit host settings');
   r=await a.send('updateSettings',{hearts:2,maxPlayers:4,fuseMinSec:6,fuseMaxSec:6,mode:'gaming'});
   assert.equal(r.ok,true);
@@ -54,6 +58,7 @@ async function main(){
   assert.equal(b.room.players[0].hearts,2,'changed hearts applied');
   r=await a.send('startGame',{});assert.equal(r.ok,true);
   await sleep(90);
+  assert(a.room.players.every(p=>p.avatar===initialAvatars.get(p.id)),'avatars stay unchanged on game start');
   const first=a.room.currentPlayerId===a.id?a:b;
   const second=first===a?b:a;
   const q=questions.find(q=>q.prompt===a.room.question);

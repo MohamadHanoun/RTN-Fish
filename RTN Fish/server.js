@@ -9,6 +9,13 @@ const rooms = new Map();
 const socketRoom = new Map();
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MIN_TIME = 6, MAX_TIME = 90, MAX_HEARTS = 10;
+const AVATARS = Object.freeze(['dog','wolf','fox','cat','bear','rabbit','lion','panda','tiger','owl','koala','raccoon']);
+
+function chooseAvatar(players = []) {
+  const occupied = new Set(players.map(player => player.avatar));
+  const available = AVATARS.filter(animal => !occupied.has(animal));
+  return available[crypto.randomInt(available.length)];
+}
 
 function safeName(value) {
   return String(value ?? '').replace(/[<>\r\n\u0000-\u001f]/g, '').trim().slice(0,18) || 'لاعب';
@@ -38,8 +45,8 @@ function serialize(room) {
     code: room.code, status: room.status, hostId: room.hostId,
     settings: {...room.settings}, maxPlayers: room.settings.maxPlayers,
     hearts: room.settings.hearts, maxHearts: room.maxHearts,
-    players: room.players.map(({id,name,hearts,charge,correct,score,timeBonus,rarityCounts}) =>
-      ({id,name,hearts,charge,correct,score,timeBonus,rarityCounts})),
+    players: room.players.map(({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts}) =>
+      ({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts})),
     currentPlayerId: room.currentPlayerId,
     question: questions.find(q => q.id === room.questionId)?.prompt ?? null,
     usedAnswers: room.usedDisplay.slice(-30), usedCount: room.used.size,
@@ -154,8 +161,8 @@ function leave(socket,notify=true) {
   broadcast(room);
 }
 function ackSafe(cb,response){if(typeof cb==='function')cb(response);}
-function makePlayer(socket,name,hearts){
-  return {id:socket.id,name:safeName(name),hearts,charge:0,correct:0,score:0,timeBonus:0,
+function makePlayer(socket,name,hearts,avatar){
+  return {id:socket.id,name:safeName(name),avatar:avatar || chooseAvatar(),hearts,charge:0,correct:0,score:0,timeBonus:0,
     rarityCounts:{common:0,uncommon:0,rare:0,epic:0,legendary:0}};
 }
 
@@ -182,7 +189,7 @@ io.on('connection',socket=>{
     const name=safeName(data?.name);
     if(room.players.some(p=>norm(p.name)===norm(name)))return ackSafe(ack,{ok:false,error:'الاسم مستخدم بالغرفة'});
     leave(socket);
-    room.players.push(makePlayer(socket,name,room.settings.hearts));
+    room.players.push(makePlayer(socket,name,room.settings.hearts,chooseAvatar(room.players)));
     socketRoom.set(socket.id,code);socket.join(code);
     room.lastActiveAt=Date.now();broadcast(room);ackSafe(ack,{ok:true,code});
   });
@@ -203,7 +210,7 @@ io.on('connection',socket=>{
     if(room.players.length<2)return ackSafe(ack,{ok:false,error:'تحتاج لاعبين على الأقل'});
     if(room.status==='playing')return ackSafe(ack,{ok:false,error:'اللعبة جارية'});
     clearFuse(room);room.status='playing';room.round=0;room.questionHistory=[];room.winnerId=null;
-    room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts)));
+    room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts,p.avatar)));
     beginQuestion(room);ackSafe(ack,{ok:true});
   });
   socket.on('previewAnswer',(data,ack)=>{

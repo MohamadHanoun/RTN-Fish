@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { questions, matchDetailed, norm } = require('../data/questions');
 const { requiredAnswers } = require('../data/progression');
+const animalArt = require('../public/animals');
 const checkTranslation=(prompt,typed,expected)=>{
   const q=questions.find(question=>question.prompt===prompt);
   assert(q,`missing question: ${prompt}`);
@@ -42,6 +43,14 @@ const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8
 assert(app.includes("new Intl.NumberFormat('en-US-u-nu-latn')"), 'live scores must use Latin digits');
 assert(!/[٠-٩۰-۹]/.test(html), 'static HTML must not show Eastern Arabic digits');
 assert(html.includes(`${questions.length} فئة`), 'home page question count must be current');
+assert.equal(Object.keys(animalArt.animals).length,12,'game needs twelve animal characters');
+for (const name of Object.keys(animalArt.animals)) {
+  const art = animalArt.svg(name);
+  assert(art.includes('<svg') && art.includes('</svg>') && art.includes('radialGradient'),`missing illustrated animal: ${name}`);
+  assert(!/onload=|<script|<image /i.test(art),'animal art should contain only trusted vector shapes');
+}
+assert(html.includes('id="arenaPlayers"') && html.includes('src="/animals.js"'),'arena artwork must load in the game');
+assert(app.includes('renderArena(room)') && app.includes('animalAvatar(p,'),'players need illustrated animal seats');
 for(const [prompt,english,arabic] of [
   ['اذكر حيوانًا أليفًا','dog','كلب'],
   ['اذكر حيوانًا أليفًا','cat','قط'],
@@ -56,4 +65,4 @@ assert(app.includes('enterInviteRoom(true)'), 'saved-name invite must autojoin')
 assert(app.includes("$('hostSettingsPanel').hidden = !isHost"), 'guest controls must stay hidden');
 assert(app.includes('room.usedCount ?? room.usedAnswers.length'), 'progress must support more than 30 used answers');
 
-console.log(`PASS: ${questions.length} categories, ${countries.length} Arab countries, dynamic answer goals, bilingual answers, invite UI`);
+console.log(`PASS: ${questions.length} categories, 12 illustrated animals, circular arena, dynamic answer goals, invite UI`);

@@ -45,6 +45,49 @@
     if (content !== undefined) el.textContent = content;
     return el;
   }
+  function animalAvatar(player, extraClass = '') {
+    const type = player.avatar || 'fox';
+    const el = node('span',`animal-avatar ${extraClass}`);
+    const art = window.SamakaAnimals;
+    if (art) {
+      el.innerHTML = art.svg(type); // Only hardcoded, trusted SVG templates are used.
+      el.style.setProperty('--animal-glow',art.animals[type]?.glow || '#64e7c1');
+      el.setAttribute('aria-label',art.animals[type]?.label || 'حيوان');
+    } else el.textContent = '🐾';
+    return el;
+  }
+  function renderArena(room) {
+    const arena = $('arenaPlayers');
+    // Keep seat nodes between broadcasts so avatars don't flicker on every answer.
+    const existing = new Map(Array.from(arena.children,el=>[el.dataset.playerId,el]));
+    const count = room.players.length;
+    room.players.forEach((p,i) => {
+      // Players sit at equally spaced, stable places around the central fish.
+      const angle = -Math.PI/2 + (2*Math.PI*i/count);
+      const x = 50 + 37*Math.cos(angle), y = 50 + 37*Math.sin(angle);
+      const current = p.id === room.currentPlayerId;
+      let seat = existing.get(p.id);
+      if(!seat) {
+        seat = node('div','arena-seat');
+        seat.dataset.playerId = p.id;
+        seat.append(animalAvatar(p,'arena-avatar'));
+        seat.append(node('span','arena-player-name'));
+        seat.append(node('span','arena-player-hearts'));
+        seat.append(node('span','arena-turn-star','✦'));
+      }
+      existing.delete(p.id);
+      seat.className = `arena-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.id===socket.id?'my-seat':''}`;
+      seat.style.left = `${x}%`;
+      seat.style.top = `${y}%`;
+      seat.style.setProperty('--seat-delay',`${i*70}ms`);
+      seat.title = `${p.name} · ${formatNumber(p.hearts)} قلوب · ${formatNumber(p.score)} نقطة`;
+      seat.querySelector('.arena-player-name').textContent = p.name;
+      seat.querySelector('.arena-player-hearts').textContent = p.hearts>0 ? `♥ ${formatNumber(p.hearts)}` : 'خرج';
+      seat.querySelector('.arena-turn-star').hidden = !current;
+      arena.append(seat);
+    });
+    for (const stale of existing.values()) stale.remove();
+  }
   function switchScreen(screen) {
     if (state.screen !== screen) {
       state.screen = screen;
@@ -155,9 +198,10 @@
     $('lobbyPlayerList').replaceChildren();
     room.players.forEach((p,i) => {
       const tile = node('div','player-tile');
-      tile.append(node('span','avatar',p.name[0] || '؟'));
+      tile.append(animalAvatar(p,'lobby-avatar'));
       const info = node('div');info.append(node('strong','',p.name));
-      info.append(node('small','',p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`));
+      const animalName = window.SamakaAnimals?.animals[p.avatar]?.label || 'حيوان';
+      info.append(node('small','',`${p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`} · ${animalName}`));
       tile.append(info);$('lobbyPlayerList').append(tile);
     });
     for(let i=room.players.length;i<room.maxPlayers;i++) {
@@ -195,11 +239,12 @@
     $('answerInput').disabled = !mine;
     $('answerBtn').disabled = !mine;
     $('timerCaption').textContent = mine ? 'أسرع! ما حدا بيعرف متى تنفجر' : 'المؤقت مخفي… لا تتأخر لما يجي دورك';
+    renderArena(room);
     $('gameCount').textContent = `${formatNumber(room.players.filter(p => p.hearts > 0).length)} ناجين`;
     $('gamePlayerList').replaceChildren();
     room.players.forEach(p => {
       const el = node('div',`game-player ${p.id === room.currentPlayerId ? 'is-active' : ''} ${p.hearts <= 0 ? 'is-dead' : ''}`);
-      el.append(node('span','avatar',p.name[0] || '؟'));
+      el.append(animalAvatar(p,'sidebar-avatar'));
       const info=node('div','player-meta');
       const title=node('strong','',p.name);
       if(p.id===socket.id) title.append(node('span','you-chip',' (أنت)'));
@@ -229,6 +274,8 @@
   }
   function updateEnded(room) {
     const winner = room.players.find(p => p.id === room.winnerId);
+    $('winnerAvatar').replaceChildren();
+    if (winner) $('winnerAvatar').append(animalAvatar(winner,'champion-avatar'));
     $('winnerName').textContent = winner ? `${winner.name} فاز!` : 'انتهت اللعبة';
     $('winnerSubtitle').textContent = winner ? 'آخر لاعب حافظ على قلوبه… بطل الجولة!' : 'كل اللاعبين خرجوا من المنافسة';
     const scores = [...room.players].sort((a,b) => b.hearts - a.hearts || b.score - a.score);
@@ -258,7 +305,9 @@
     if(event.type==='pop') {
       beep('pop');
       const gameCard=$('game').querySelector('.game-card');
-      gameCard.classList.add('boom');setTimeout(()=>gameCard.classList.remove('boom'),800);
+      gameCard.classList.add('boom');
+      $('arena').classList.add('is-exploding');
+      setTimeout(()=>{gameCard.classList.remove('boom');$('arena').classList.remove('is-exploding');},800);
       toast(event.text);
     }
     if(event.type==='win') toast(event.text);

@@ -61,3 +61,59 @@ main{max-width:1220px;padding:26px 30px 70px;margin:0 auto}.screen{display:none}
 .answer-suggestion.rarity-preview.epic{color:#da9aff}
 .answer-suggestion.rarity-preview.legendary{color:#ffdf80}
 @media(max-width:740px){.host-settings{padding:18px}.rarity{font-size:9px;padding:4px 6px}.reward-note{font-size:10px}.settings-summary{font-size:11px}}
+
+/* Circular multiplayer arena and original illustrated animal characters. */
+.game-card{background:radial-gradient(ellipse at 50% 38%,#1d3848 0,#142438 40%,#101b2c 82%);border:1px solid #4c8a89aa;box-shadow:0 22px 80px #030d20a6,0 0 80px #50d0bc12}
+.game-card .prompt-kicker{display:inline-flex;padding:5px 14px;border:1px solid #68e3c744;background:#173e46a9;border-radius:30px;letter-spacing:.3px}
+.game-card .big-question{color:#f5fcff;text-shadow:0 4px 25px #72edca2a;max-width:650px}
+.holder-chip{box-shadow:0 5px 22px #05152277;border:1px solid #93eac122}
+.holder-chip.mine{box-shadow:0 0 25px #51e9a255;border-color:#80ffbd99}
+.arena{position:relative;isolation:isolate;width:min(100%,680px);aspect-ratio:1;margin:5px auto 14px;border-radius:50%;background:radial-gradient(circle at 50% 45%,#1f5861 0,#143747 32%,#11283c 62%,#101a30 79%);box-shadow:inset 0 0 85px #051323,0 0 45px #46dcc01b}
+.arena:before{content:'';position:absolute;inset:3%;border-radius:50%;background:conic-gradient(from 20deg,#60eac129,#3b7ca010,#8fd9ed30,#ffcc7a12,#60eac129);filter:blur(16px);animation:arenaGlow 12s linear infinite;pointer-events:none}
+.arena:after{content:'';position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 2px #79f8d733,inset 0 0 24px #79f8d720;pointer-events:none;z-index:4}
+.arena-floor{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,#9cf8dd0a 0 27%,transparent 28%),repeating-radial-gradient(circle,#6beace0a 0 1px,transparent 1px 23px)}
+.arena-ring{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.arena-ring.ring-one{width:90%;aspect-ratio:1;border:2px solid #76e7ce26;box-shadow:0 0 26px #52bdb62c,inset 0 0 26px #52bdb626}
+.arena-ring.ring-two{width:68%;aspect-ratio:1;border:2px dashed #65dbbc45;animation:orbitSpin 42s linear infinite}
+.arena-ring.ring-three{width:41%;aspect-ratio:1;border:2px solid #ffd7873b;box-shadow:0 0 22px #f6c06a35}
+.arena-spark{position:absolute;color:#9ffce4;text-shadow:0 0 22px currentColor;z-index:1;pointer-events:none;animation:twinkle 3.7s ease-in-out infinite}
+.spark-a{top:26%;left:24%;font-size:22px}.spark-b{top:77%;left:69%;font-size:28px;animation-delay:1s}.spark-c{top:40%;left:83%;font-size:16px;animation-delay:2s}
+.arena-center{position:absolute;z-index:2;inset:28%;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none}
+.arena-fish-glow{position:absolute;width:100%;height:70%;border-radius:50%;background:radial-gradient(ellipse,#ffca7d80,transparent 70%);filter:blur(17px)}
+.arena-center .game-fish{width:100%;max-width:260px;z-index:1;filter:drop-shadow(0 10px 15px #06121faa) drop-shadow(0 0 18px #ffbd7675);animation:arenaFishFloat 3.5s ease-in-out infinite}
+.arena-center-label{position:absolute;z-index:2;bottom:1%;font:900 clamp(10px,1.7vw,17px) Arial,sans-serif;color:#fff5d7;letter-spacing:2.5px;text-shadow:0 2px 10px #d38f5d}
+.game-card.danger .arena-center .game-fish{animation:panic .44s ease-in-out infinite}
+.arena.is-exploding:after{animation:arenaBlast .72s ease-out forwards;box-shadow:inset 0 0 55px #ffb56c,0 0 70px #ff7f7888;border:3px solid #ffd18a}
+.arena.is-exploding .arena-center .game-fish{animation:pop .65s ease-out!important}
+.arena-players{position:absolute;inset:0;z-index:3}
+.arena-seat{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:clamp(70px,11vw,112px);min-height:102px;padding:5px 4px;border-radius:19px;background:linear-gradient(160deg,#203a4df0,#142033ee);border:1px solid #7ebfca55;box-shadow:0 8px 25px #040e20ba,inset 0 1px 0 #fff2;transition:left .45s,top .45s,transform .35s,border-color .3s,box-shadow .3s,opacity .3s;animation:seatAppear .42s ease-out both;animation-delay:var(--seat-delay)}
+.arena-seat.my-seat{border-color:#8ddcfe8c;background:linear-gradient(160deg,#23455af0,#162b46eb)}
+.arena-seat.on-turn{border:2px solid #a3ffd4;box-shadow:0 0 0 4px #53f0b52b,0 0 35px #61ffc799,0 10px 26px #031323d9;transform:translate(-50%,-50%) scale(1.1);z-index:5;background:linear-gradient(160deg,#275c54ee,#163c41ef)}
+.arena-seat.on-turn:before{content:'';position:absolute;inset:-7px;border:2px solid #74ffe088;border-radius:24px;animation:activeSeatPulse 1.5s ease-in-out infinite;pointer-events:none}
+.arena-seat.eliminated{opacity:.35;filter:grayscale(1);border-color:#5c6677;transform:translate(-50%,-50%) scale(.89)}
+.arena-seat .animal-avatar{width:clamp(54px,8vw,83px);height:clamp(54px,8vw,83px);margin-top:-7px}
+.arena-player-name{max-width:100%;font-size:clamp(9px,1.22vw,13px);font-weight:900;color:#f4fffc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.arena-player-hearts{display:inline-flex;align-items:center;justify-content:center;min-width:40px;padding:1px 6px;font:900 11px Arial,sans-serif;direction:ltr;color:#ff94aa;background:#612f4666;border-radius:20px}
+.arena-turn-star{position:absolute;top:-19px;left:50%;transform:translateX(-50%);color:#fff2a3;font-size:23px;text-shadow:0 0 22px #ffe285;animation:twinkle 1s ease-in-out infinite}
+.animal-avatar{--animal-glow:#64e7c1;position:relative;display:inline-flex;justify-content:center;align-items:center;flex:none;isolation:isolate;aspect-ratio:1;width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 40% 30%,#f9fcff38,#274254 60%,#102236 94%);border:2px solid #ffffff45;box-shadow:0 2px 12px #020b17aa,0 0 15px color-mix(in srgb,var(--animal-glow),transparent 70%);overflow:visible}
+.animal-avatar:before{content:'';position:absolute;inset:-5px;border-radius:50%;border:1px solid color-mix(in srgb,var(--animal-glow),transparent 50%);z-index:-1}
+.animal-avatar svg{display:block;width:106%;height:106%;overflow:visible;filter:drop-shadow(0 3px 4px #020c1c7a)}
+.lobby-avatar{width:59px;height:59px}
+.player-tile{transition:border-color .2s,transform .2s}.player-tile:has(.animal-avatar){border-color:#559eac4b}
+.player-tile .animal-avatar{flex-shrink:0}
+.game-player{background:linear-gradient(110deg,#132739,#0e1d30);border-color:#58889440}
+.game-player.is-active{border-color:#83f9ce;box-shadow:0 0 17px #4ae3b83d,0 0 0 1px #64e7c144}
+.sidebar-avatar{width:47px;height:47px}
+.winner-avatar{margin:5px auto 4px;display:flex;justify-content:center}
+.champion-avatar{width:148px;height:148px;border:4px solid #ffe4a4;box-shadow:0 0 0 8px #d4a55c22,0 0 70px #ffd98b6d,0 14px 35px #060c1d}
+.result-card .trophy{font-size:40px;color:#ffdc92;text-shadow:0 0 27px #ffd48d}
+@keyframes seatAppear{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:blur(0)}}
+@keyframes activeSeatPulse{0%,100%{opacity:.45;transform:scale(.97)}50%{opacity:1;transform:scale(1.035)}}
+@keyframes arenaFishFloat{0%,100%{transform:translateY(4px) rotate(-3deg)}50%{transform:translateY(-7px) rotate(3deg)}}
+@keyframes orbitSpin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes arenaGlow{to{transform:rotate(360deg)}}
+@keyframes twinkle{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes arenaBlast{from{opacity:1;transform:scale(.95)}to{opacity:0;transform:scale(1.12)}}
+@media(max-width:980px){.game-grid{grid-template-columns:minmax(0,1fr) 275px}.arena-seat{width:clamp(66px,9vw,100px);min-height:89px}.arena-seat .animal-avatar{width:clamp(51px,7vw,72px);height:clamp(51px,7vw,72px)}}
+@media(max-width:740px){.game-card{padding:17px 9px 20px}.arena{width:100%;margin:5px auto 17px}.arena-seat{width:clamp(48px,17vw,72px);min-height:67px;padding:3px 2px;border-radius:12px;gap:0}.arena-seat .animal-avatar{width:clamp(40px,12vw,54px);height:clamp(40px,12vw,54px);margin-top:-4px;border-width:1px}.arena-player-name{font-size:clamp(8px,2.35vw,10px)}.arena-player-hearts{font-size:9px;min-width:30px;padding:1px 4px}.arena-seat.on-turn:before{inset:-4px;border-radius:15px}.arena-turn-star{top:-13px;font-size:16px}.arena-center-label{letter-spacing:1px;font-size:9px}.sidebar-avatar{width:38px;height:38px}.lobby-avatar{width:52px;height:52px}.game-player .animal-avatar{width:34px;height:34px}}
+@media(max-width:390px){.arena-seat{width:48px;min-height:60px}.arena-seat .animal-avatar{width:36px;height:36px}.arena-player-name{max-width:46px;font-size:8px}.arena-player-hearts{font-size:8px}.arena-center-label{display:none}}
