@@ -1,6 +1,7 @@
 'use strict';
 const { norm, extendAliases, lookup, matchDetailed } = require('./matcher');
 const gamingRaw = require('./gaming');
+const worldRaw = require('./world');
 // All question prompts and answer lists below are original Arabic content.
 // Earlier entries are typically more familiar; later ones are given a higher bonus.
 // Optional answer aliases are separated by |.
@@ -184,7 +185,7 @@ const rarityLevels = [
 ];
 const gamingPrompts = new Set(gamingRaw.map(q => q[0]));
 const legacyGamingPattern = /لعبة فيديو|جهاز ألعاب|شركة ألعاب|لعبة ورق|لعبة جماعية|لعبة لوحية/;
-const allRaw = [...raw, ...gamingRaw];
+const allRaw = [...raw, ...worldRaw, ...gamingRaw];
 const questions = allRaw.map(([prompt, serialized], idx) => {
   const entries = serialized.split(',').map(s => s.trim()).filter(Boolean);
   const seen = new Set();

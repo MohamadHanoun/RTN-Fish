@@ -4,7 +4,7 @@
   const socket = io({ reconnectionAttempts: 10 });
   const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1 };
   let toastTimeout = null, feedbackTimeout = null, actx = null, previewTimer = null, previewSeq = 0;
-  const arabicNumber = n => Number(n || 0).toLocaleString('ar-EG');
+  const arabicNumber = n => Number(n || 0).toLocaleString('en-US');
   function beep(kind = 'pass') {
     if (!state.sound) return;
     try {
