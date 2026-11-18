@@ -121,13 +121,19 @@ function startFuseFor(room,player,applyBonus=false) {
   const extra=applyBonus?Math.min(15,player.timeBonus):0;
   if(applyBonus) player.timeBonus=0;
   room.phaseStarted=Date.now();
-  const randomDuration=crypto.randomInt(room.settings.fuseMinSec*1000,room.settings.fuseMaxSec*1000+1);
-  setFuse(room,randomDuration+extra*1000);
+  // Pick a personal time allowance once per question. If the fish returns to
+  // this player, they start from that SAME full allowance, not the old remainder.
+  let baseDuration=room.turnDurationByPlayer.get(player.id);
+  if(baseDuration===undefined) {
+    baseDuration=crypto.randomInt(room.settings.fuseMinSec*1000,room.settings.fuseMaxSec*1000+1);
+    room.turnDurationByPlayer.set(player.id,baseDuration);
+  }
+  setFuse(room,baseDuration+extra*1000);
   return extra;
 }
 function beginQuestion(room,preferredId=null) {
   if(activePlayers(room).length<=1) return endGame(room);
-  room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();
+  room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();room.turnDurationByPlayer=new Map();
   const question=chooseQuestion(room);
   room.questionId=question.id;
   room.answerGoal=requiredAnswers(question.answers.length);
@@ -282,9 +288,10 @@ io.on('connection',socket=>{
       // A fraction of the question's available answers unlocks the next question.
       beginQuestion(room,next?.id);
     } else {
-      const remaining=Math.max(1,room.fuseEndsAt-now); // shared fuse continues between answers
+      // Every turn has a fresh timer. The outgoing player's unused time never
+      // carries over to the next player or their next turn on this question.
       room.currentPlayerId=next?.id ?? null;
-      room.phaseStarted=Date.now();setFuse(room,remaining);
+      if(next)startFuseFor(room,next);
     }
     const reward=heartsGained?` +${heartsGained} قلب`:gainedTime?` +${gainedTime} ثواني لجولة قادمة`:'';
     emitFeed(room,'answer',`${player.name} جاوب «${answer.display}» — ${answer.rarityLabel} (+${answer.value} نقطة${reward})`,

@@ -42,7 +42,7 @@ async function main(){
   }
   const a=new Client(),b=new Client();
   await a.connect();await b.connect();
-  let r=await a.send('createRoom',{name:'ليلى',maxPlayers:3,hearts:3,fuseMinSec:6,fuseMaxSec:6,mode:'gaming'});
+  let r=await a.send('createRoom',{name:'ليلى',maxPlayers:3,hearts:3,fuseMinSec:6,fuseMaxSec:8,mode:'gaming'});
   assert.equal(r.ok,true);const code=r.code;
   assert.equal(a.room.settings.mode,'gaming');
   assert.equal(a.room.maxPlayers,10,'rooms should fill automatically without a player-count setting');
@@ -52,7 +52,7 @@ async function main(){
   assert.equal(new Set(a.room.players.map(p=>p.avatar)).size,a.room.players.length,'animal avatars are unique within a room');
   const initialAvatars=new Map(a.room.players.map(p=>[p.id,p.avatar]));
   r=await b.send('updateSettings',{hearts:8});assert.equal(r.ok,false,'guest cannot edit host settings');
-  r=await a.send('updateSettings',{hearts:2,maxPlayers:4,fuseMinSec:6,fuseMaxSec:6,mode:'gaming'});
+  r=await a.send('updateSettings',{hearts:2,maxPlayers:4,fuseMinSec:6,fuseMaxSec:8,mode:'gaming'});
   assert.equal(r.ok,true);
   await sleep(60);
   assert.equal(b.room.settings.hearts,2,'settings sync to guests');
@@ -60,7 +60,8 @@ async function main(){
   r=await a.send('startGame',{});assert.equal(r.ok,true);
   await sleep(90);
   assert(a.room.fuseEndsAt>Date.now(),'every player receives a visible server countdown');
-  assert.equal(a.room.fuseDurationMs,6000,'timer duration must be consistent with room settings');
+  assert(a.room.fuseDurationMs>=6000&&a.room.fuseDurationMs<=8000,'timer duration must stay within room settings');
+  const firstAllowance=a.room.fuseDurationMs;
   assert(typeof a.room.theme==='string','questions should include their diversity theme');
   assert(a.room.players.every(p=>p.avatar===initialAvatars.get(p.id)),'avatars stay unchanged on game start');
   const first=a.room.currentPlayerId===a.id?a:b;
@@ -76,6 +77,10 @@ async function main(){
   await sleep(260);
   r=await first.send('previewAnswer',{answer:legendary.display});
   assert.equal(r.suggestion.rarity,'legendary');
+  // A valid answer near the end of a turn must not leave the next player
+  // with just the remaining seconds from the outgoing player's timer.
+  await sleep(Math.max(0,first.room.fuseEndsAt-Date.now()-3000));
+  assert(first.room.fuseEndsAt-Date.now()<4000,'the first player should have used most of their time');
   r=await first.send('submitAnswer',{answer:legendary.display});
   assert.equal(r.ok,true);assert.equal(r.rarity,'legendary');assert.equal(r.heartsGained,1);
   assert.equal(r.gainedTime,7);
@@ -84,24 +89,30 @@ async function main(){
   assert.equal(first.room.players.find(p=>p.id===first.id).hearts,3);
   assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,7);
   assert.equal(first.room.currentPlayerId,second.id);
+  assert(second.room.fuseDurationMs>=6000&&second.room.fuseDurationMs<=8000,'a correct answer must give the next player a fresh full timer');
+  const secondAllowance=second.room.fuseDurationMs;
+  assert(second.room.fuseEndsAt-Date.now()>5600,'the next player gets a full turn, not the previous player\'s remainder');
   const common=q.answers.find(x=>x.rarity==='common'&&matchDetailed(q,x.display)?.answer===x);
   assert(common);
-  await sleep(250);
+  await sleep(Math.max(0,second.room.fuseEndsAt-Date.now()-3000));
   r=await second.send('submitAnswer',{answer:common.display});
   assert.equal(r.ok,true);
   await sleep(60);
   assert.equal(second.room.currentPlayerId,first.id);
+  assert.equal(first.room.fuseDurationMs,firstAllowance,'the original player must regain their own full allowance on return');
+  assert(first.room.fuseEndsAt-Date.now()>5600,'returning to a player renews their entire turn');
   assert.equal(first.room.usedAnswers.length,2,'accepted answers share one question');
   assert.equal(first.room.answerGoal,requiredAnswers(q.answers.length),'required answers depend on category size');
   // An explosion must cost the holder one heart and PASS the same question.
   const initialQuestion=first.room.question;
-  await sleep(6300);
+  await sleep(Math.max(0,first.room.fuseEndsAt-Date.now())+300);
   assert.equal(first.room.round,1,'one failed player must not change the question');
   assert.equal(first.room.question,initialQuestion,'failed answers keep the current question');
   assert.equal(first.room.currentPlayerId,second.id,'fish passes to the next alive player after explosion');
+  assert.equal(second.room.fuseDurationMs,secondAllowance,'an explosion also renews the next player\'s personal time');
   assert.equal(first.room.players.find(p=>p.id===first.id).hearts,2,'failure removes one heart');
   // After every survivor fails without a new correct answer, switch questions.
-  await sleep(6300);
+  await sleep(Math.max(0,second.room.fuseEndsAt-Date.now())+300);
   assert.equal(first.room.round,2,'all players failing must unlock the next question');
   assert.notEqual(first.room.question,initialQuestion);
   assert.notEqual(first.room.theme,questionTheme,'consecutive questions should rotate themes when available');
