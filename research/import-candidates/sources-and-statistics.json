@@ -2,7 +2,7 @@
   "created_at": "2026-11-18",
   "stage": "research_candidate_only",
   "repo_branch": "research/data-catalog-2026-11-18",
-  "total_candidate_records": 61159,
+  "total_candidate_records": 274912,
   "counts": {
     "wordnet_concepts": 9916,
     "wordnet_nouns": 6884,
@@ -16,7 +16,9 @@
     "geonames_arabic_script_variants_staged": 22096,
     "geonames_latin_script_variants_staged": 200247,
     "wiktionary_arabic_entries": 16815,
-    "wikidata_country_qids": 248
+    "wikidata_country_qids": 248,
+    "wikidata_ar_en_entity_title_pairs": 213753,
+    "wikidata_metadata_pages_excluded": 102888
   },
   "not_merged_into_main": true,
   "not_loaded_by_live_game": true,
@@ -70,6 +72,16 @@
       "source_file": "data/country-codes.csv",
       "license": "CC0 for Wikidata IDs only",
       "warning": "The full Wikidata entities were NOT retrieved. No UNTERM or restricted country-name columns were copied."
+    },
+    {
+      "key": "wikidata-ar-en",
+      "category": "wikidata-linked encyclopedia title pairs",
+      "name": "Arabic ↔ English encyclopedia article title alignment",
+      "url": "https://github.com/open-dict-data/wikidict-en",
+      "source_file": "data/ar-en_wiki.txt",
+      "source_blob": "df8a03237c12c7b9e8e85846b602f28bd5198a31",
+      "license": "CC0 1.0 (as declared by source repository)",
+      "warning": "These pairs are article titles connected through Wikidata, not general synonyms or proof of membership in a particular game category. Metadata namespaces excluded; remain unverified."
     }
   ],
   "next_steps": [
@@ -78,6 +90,7 @@
     "Review Arabic and English aliases and disambiguation",
     "Keep BY-SA content in separately attributed datasets",
     "Run false-positive/false-negative evaluations against current questions before any activation",
-    "Discuss with user before integrating into main branch or changing gameplay"
+    "Discuss with user before integrating into main branch or changing gameplay",
+    "Fetch Wikidata entity types and QIDs before promoting encyclopedia title pairs into specific question categories."
   ]
 }
