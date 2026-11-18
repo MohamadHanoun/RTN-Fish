@@ -4,6 +4,9 @@
   const socket = io({ reconnectionAttempts: 10 });
   const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1 };
   let toastTimeout = null, feedbackTimeout = null, actx = null, previewTimer = null, previewSeq = 0;
+  const roomFromLink = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
+  let pendingInviteCode = /^[A-Z]{4}$/.test(roomFromLink || '') ? roomFromLink : null;
+  let inviteJoining = false, inviteAutoAttempted = false;
   // Always show Western digits (0–9), even if the browser uses an Arabic locale.
   const numberFormatter = new Intl.NumberFormat('en-US-u-nu-latn');
   const formatNumber = n => numberFormatter.format(Number(n || 0));
@@ -49,13 +52,14 @@
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }
-  function getName() {
-    const name = $('username').value.trim().slice(0, 18);
-    if (!name) { toast('اكتب اسمك أولًا'); $('username').focus(); return null; }
+  function saveName(input) {
+    const name = input.value.trim().slice(0, 18);
+    if (!name) { toast('اكتب اسمك أولًا'); input.focus(); return null; }
     localStorage.setItem('samaka-name', name);
     state.name = name;
     return name;
   }
+  function getName() { return saveName($('username')); }
   function request(event, data, cb) {
     if (!socket.connected) return toast('الاتصال مقطوع. جرّب من جديد بعد الاتصال');
     socket.timeout(6000).emit(event, data, (err, response) => {
@@ -79,6 +83,7 @@
     return true;
   }
   function saveHostSettings() {
+    if (!state.room || state.room.hostId !== socket.id) return toast('فقط الهوست يقدر يعدّل الإعدادات');
     const settings = getHostSettings();
     if (!checkSettings(settings)) return;
     request('updateSettings', settings, () => toast('تم حفظ الإعدادات لكل اللاعبين'));
@@ -100,6 +105,32 @@
       history.replaceState(null, '', `/?room=${code}`);
       toast('دخلت الغرفة!');
     });
+  }
+  function enterInviteRoom(automatic = false) {
+    if (!pendingInviteCode || inviteJoining) return;
+    const name = automatic ? state.name : saveName($('inviteName'));
+    if (!name) return;
+    if (!socket.connected) return showInviteError('عم نتصل بالسيرفر، حاول بعد لحظة');
+    inviteJoining = true;
+    $('inviteJoinBtn').disabled = true;
+    $('inviteError').textContent = '';
+    $('inviteStatus').textContent = 'عم ندخّلك على الغرفة…';
+    socket.timeout(6000).emit('joinRoom',{code:pendingInviteCode,name},(err,response)=>{
+      inviteJoining = false;
+      $('inviteJoinBtn').disabled = false;
+      if(err || !response?.ok) {
+        showInviteError(response?.error || 'تعذّر الانضمام للغرفة، جرّب مرة ثانية');
+        $('inviteName').value = name;
+        $('inviteName').focus();
+        return;
+      }
+      pendingInviteCode = null;
+      history.replaceState(null,'',`/?room=${response.code}`);
+    });
+  }
+  function showInviteError(message) {
+    $('inviteStatus').textContent = 'اكتب اسمك للانضمام إلى الغرفة';
+    $('inviteError').textContent = message;
   }
   function leaveRoom() {
     request('leaveRoom', {}, () => {
@@ -136,6 +167,9 @@
     }
     const isHost = room.hostId === socket.id;
     $('hostSettingsPanel').hidden = !isHost;
+    $('hostSettingsPanel').inert = !isHost;
+    $('hostSettingsPanel').setAttribute('aria-hidden',String(!isHost));
+    $('saveSettingsBtn').disabled = !isHost;
     if (isHost) {
       const fields = { hostMaxPlayers:'maxPlayers', hostHearts:'hearts', hostMinTime:'fuseMinSec',
         hostMaxTime:'fuseMaxSec', hostMode:'mode' };
@@ -153,7 +187,7 @@
   function updateGame(room) {
     const mine = room.currentPlayerId === socket.id;
     const holder = room.players.find(p => p.id === room.currentPlayerId);
-    $('roundLabel').textContent = `الجولة ${formatNumber(room.round)}`;
+    $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}`;
     $('gameHeadline').textContent = mine ? 'السمكة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
     $('holderChip').textContent = mine ? 'دورك الآن: جاوب ومرّر بسرعة' : `الدور عند ${holder?.name || 'لاعب آخر'}`;
@@ -177,7 +211,7 @@
       const bar=node('div','chargebar');const fill=node('span');fill.style.width=`${Math.max(0,Math.min(100,p.charge))}%`;bar.append(fill);info.append(bar);
       el.append(info); $('gamePlayerList').append(el);
     });
-    $('usedCount').textContent = formatNumber(room.usedAnswers.length);
+    $('usedCount').textContent = `${formatNumber(room.usedAnswers.length)} / ${formatNumber(room.answerGoal || 4)}`;
     $('usedList').replaceChildren();
     if (!room.usedAnswers.length) $('usedList').append(node('span','muted','لسه ما في إجابات'));
     else room.usedAnswers.forEach(a => {
@@ -273,6 +307,10 @@
     $('statusIndicator').querySelector('span').textContent = 'متصل';
     // Socket IDs change on reconnect. An existing room cannot be resumed in this version.
     if (state.room) { toast('رجع الاتصال. أدخل رمز الغرفة من جديد');state.room=null;state.wasMyTurn=false;switchScreen('home'); }
+    if(pendingInviteCode && state.name && !inviteAutoAttempted) {
+      inviteAutoAttempted = true;
+      enterInviteRoom(true);
+    }
   });
   socket.on('disconnect', () => {
     $('statusIndicator').classList.remove('online');
@@ -281,11 +319,20 @@
   socket.on('state',onState);
   socket.on('feed',onFeed);
   $('username').value=state.name;
-  const deepLinkCode = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
-  if(deepLinkCode && /^[A-Z]{4}$/.test(deepLinkCode)) {
-    $('roomCodeInput').value=deepLinkCode;
-    if(state.name) toast('اكتب اسمك أو انضم مباشرة للغرفة');
+  $('inviteName').value=state.name;
+  if(pendingInviteCode) {
+    $('inviteCode').textContent=pendingInviteCode;
+    $('roomCodeInput').value=pendingInviteCode;
+    switchScreen('invite');
+    if(!state.name) $('inviteName').focus();
   }
+  $('inviteForm').addEventListener('submit', e=>{e.preventDefault();enterInviteRoom();});
+  $('inviteBackBtn').addEventListener('click',()=>{
+    pendingInviteCode=null;
+    history.replaceState(null,'','/');
+    $('inviteError').textContent='';
+    switchScreen('home');
+  });
   $('roomCodeInput').addEventListener('input',()=>{$('roomCodeInput').value=$('roomCodeInput').value.replace(/[^a-z]/gi,'').toUpperCase().slice(0,4)});
   $('createBtn').addEventListener('click',createRoom);
   $('joinBtn').addEventListener('click',joinRoom);

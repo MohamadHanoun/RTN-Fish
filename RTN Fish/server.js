@@ -8,6 +8,7 @@ const rooms = new Map();
 const socketRoom = new Map();
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MIN_TIME = 6, MAX_TIME = 90, MAX_HEARTS = 10;
+const ANSWERS_PER_QUESTION = 4;
 
 function safeName(value) {
   return String(value ?? '').replace(/[<>\r\n\u0000-\u001f]/g, '').trim().slice(0,18) || 'لاعب';
@@ -42,7 +43,7 @@ function serialize(room) {
     currentPlayerId: room.currentPlayerId,
     question: questions.find(q => q.id === room.questionId)?.prompt ?? null,
     usedAnswers: room.usedDisplay.slice(-30),
-    round: room.round, recent: room.recent, winnerId: room.winnerId,
+    round: room.round, answerGoal: room.answerGoal, recent: room.recent, winnerId: room.winnerId,
     // The precise fuse duration and end time must stay hidden on the server.
     phaseStarted: room.phaseStarted
   };
@@ -86,21 +87,27 @@ function chooseQuestion(room) {
   room.questionHistory.push(question.id);
   return question;
 }
-function beginRound(room,preferredId=null) {
-  if(activePlayers(room).length<=1) return endGame(room);
-  room.round++;room.used=new Set();room.usedDisplay=[];
-  room.questionId=chooseQuestion(room).id;
-  const selected=activePlayers(room).find(p=>p.id===preferredId)
-    ||activePlayers(room)[crypto.randomInt(activePlayers(room).length)];
-  room.currentPlayerId=selected.id;
-  const extra=Math.min(15,selected.timeBonus);
-  selected.timeBonus=0; // bonus earned earlier applies when that player next starts a fresh round.
+function startFuseFor(room,player,applyBonus=false) {
+  const extra=applyBonus?Math.min(15,player.timeBonus):0;
+  if(applyBonus) player.timeBonus=0;
   room.phaseStarted=Date.now();
   const randomDuration=crypto.randomInt(room.settings.fuseMinSec*1000,room.settings.fuseMaxSec*1000+1);
   setFuse(room,randomDuration+extra*1000);
+  return extra;
+}
+function beginQuestion(room,preferredId=null) {
+  if(activePlayers(room).length<=1) return endGame(room);
+  room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();
+  const question=chooseQuestion(room);
+  room.questionId=question.id;
+  room.answerGoal=Math.min(ANSWERS_PER_QUESTION,question.answers.length);
+  const selected=activePlayers(room).find(p=>p.id===preferredId)
+    ||activePlayers(room)[crypto.randomInt(activePlayers(room).length)];
+  room.currentPlayerId=selected.id;
+  const extra=startFuseFor(room,selected,true);
   broadcast(room);
   io.to(room.code).emit('round',{round:room.round,bonusPlayerId:extra?selected.id:null,bonusSeconds:extra});
-  if(extra) emitFeed(room,'time',`${selected.name} بدأ الجولة ومعه +${extra} ثوانٍ مكافأة!`,{bonusSeconds:extra});
+  if(extra) emitFeed(room,'time',`${selected.name} بدأ السؤال الجديد ومعه +${extra} ثوانٍ مكافأة!`,{bonusSeconds:extra});
 }
 function explode(code) {
   const room=rooms.get(code);
@@ -108,11 +115,22 @@ function explode(code) {
   const holder=room.players.find(p=>p.id===room.currentPlayerId);
   if(!holder) return endGame(room);
   holder.hearts=Math.max(0,holder.hearts-1);
+  room.failedSinceAnswer.add(holder.id);
   clearFuse(room);
   emitFeed(room,'pop',`انفجرت السمكة عند ${holder.name} وخسر قلب!`);
   if(activePlayers(room).length<=1) return endGame(room);
-  const next=holder.hearts>0?holder.id:nextActive(room,holder.id)?.id;
-  beginRound(room,next);
+  // An explosion costs one heart and passes the fish to the NEXT living player.
+  // The same question and its used answers stay active until the answer goal is reached.
+  const next=nextActive(room,holder.id);
+  if(activePlayers(room).every(p=>room.failedSinceAnswer.has(p.id))) {
+    // Everybody still alive has lost a heart without a successful answer:
+    // don't trap the group on an impossible question.
+    beginQuestion(room,next.id);
+    return;
+  }
+  room.currentPlayerId=next.id;
+  startFuseFor(room,next);
+  broadcast(room);
 }
 function leave(socket,notify=true) {
   const code=socketRoom.get(socket.id);if(!code)return;
@@ -150,7 +168,7 @@ io.on('connection',socket=>{
     const code=roomCode();
     const room={code,settings,maxHearts:Math.min(MAX_HEARTS,settings.hearts+3),hostId:socket.id,
       status:'lobby',players:[makePlayer(socket,data?.name,settings.hearts)],used:new Set(),
-      usedDisplay:[],questionId:null,questionHistory:[],round:0,currentPlayerId:null,
+      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],round:0,answerGoal:ANSWERS_PER_QUESTION,currentPlayerId:null,
       fuseEndsAt:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
     rooms.set(code,room);socketRoom.set(socket.id,code);socket.join(code);broadcast(room);
     ackSafe(ack,{ok:true,code});
@@ -186,7 +204,7 @@ io.on('connection',socket=>{
     if(room.status==='playing')return ackSafe(ack,{ok:false,error:'اللعبة جارية'});
     clearFuse(room);room.status='playing';room.round=0;room.questionHistory=[];room.winnerId=null;
     room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts)));
-    beginRound(room);ackSafe(ack,{ok:true});
+    beginQuestion(room);ackSafe(ack,{ok:true});
   });
   socket.on('previewAnswer',(data,ack)=>{
     const now=Date.now();
@@ -215,6 +233,7 @@ io.on('connection',socket=>{
     const answer=match.answer,key=norm(answer.display);
     if(room.used.has(key))return ackSafe(ack,{ok:false,error:`${answer.display} مستخدمة! جرّب جواب غيره`});
     room.used.add(key);room.usedDisplay.push({display:answer.display,rarity:answer.rarity,rarityLabel:answer.rarityLabel});
+    room.failedSinceAnswer.clear();
     const player=room.players.find(p=>p.id===socket.id);
     player.correct++;player.score+=answer.value;player.charge+=answer.value;
     player.rarityCounts[answer.rarity]++;
@@ -226,9 +245,15 @@ io.on('connection',socket=>{
     if(player.charge>=100){player.charge-=100;
       if(player.hearts<room.maxHearts){player.hearts++;heartsGained++;}
     }
-    const remaining=Math.max(1,room.fuseEndsAt-now); // no resetting the shared fuse on each answer
-    room.currentPlayerId=nextActive(room,socket.id)?.id ?? null;
-    room.phaseStarted=Date.now();setFuse(room,remaining);
+    const next=nextActive(room,socket.id);
+    if(room.used.size>=room.answerGoal) {
+      // Four distinct accepted answers unlock a fresh question, not a new match.
+      beginQuestion(room,next?.id);
+    } else {
+      const remaining=Math.max(1,room.fuseEndsAt-now); // shared fuse continues between answers
+      room.currentPlayerId=next?.id ?? null;
+      room.phaseStarted=Date.now();setFuse(room,remaining);
+    }
     const reward=heartsGained?` +${heartsGained} قلب`:gainedTime?` +${gainedTime} ثواني لجولة قادمة`:'';
     emitFeed(room,'answer',`${player.name} جاوب «${answer.display}» — ${answer.rarityLabel} (+${answer.value} نقطة${reward})`,
       {rarity:answer.rarity,answer:answer.display,points:answer.value,heartsGained,gainedTime});

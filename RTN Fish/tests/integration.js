@@ -73,18 +73,63 @@ async function main(){
   await sleep(250);
   r=await second.send('submitAnswer',{answer:common.display});
   assert.equal(r.ok,true);
+  await sleep(60);
   assert.equal(second.room.currentPlayerId,first.id);
-  // Explosion starts a fresh round for the holder; earned time is consumed.
+  assert.equal(first.room.usedAnswers.length,2,'accepted answers share one question');
+  assert.equal(first.room.answerGoal,4,'four accepted answers are needed');
+  // An explosion must cost the holder one heart and PASS the same question.
+  const initialQuestion=first.room.question;
   await sleep(6300);
-  assert.equal(first.room.round,2,'explosion starts a new round');
-  assert.equal(first.room.currentPlayerId,first.id);
-  assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,0,'time bonus applied to next fresh round');
+  assert.equal(first.room.round,1,'one failed player must not change the question');
+  assert.equal(first.room.question,initialQuestion,'failed answers keep the current question');
+  assert.equal(first.room.currentPlayerId,second.id,'fish passes to the next alive player after explosion');
+  assert.equal(first.room.players.find(p=>p.id===first.id).hearts,2,'failure removes one heart');
+  // After every survivor fails without a new correct answer, switch questions.
+  await sleep(6300);
+  assert.equal(first.room.round,2,'all players failing must unlock the next question');
+  assert.notEqual(first.room.question,initialQuestion);
+  assert.equal(first.room.usedAnswers.length,0,'new question resets used answers');
+  assert.equal(first.room.currentPlayerId,first.id,'pass continues around the table');
+  assert.equal(first.room.players.find(p=>p.id===second.id).hearts,1);
+  assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,0,'time bonus applies to a new question');
+  // Four distinct answers advance to a new question without ending the match.
+  const questionTwo=questions.find(x=>x.prompt===first.room.question);
+  const four=questionTwo.answers.filter(x=>matchDetailed(questionTwo,x.display)?.answer===x).slice(0,4);
+  assert.equal(four.length,4);
+  for(let i=0;i<4;i++) {
+    const holder=first.room.currentPlayerId===a.id?a:b;
+    await sleep(260);
+    const response=await holder.send('submitAnswer',{answer:four[i].display});
+    assert.equal(response.ok,true,`answer ${i+1} accepted`);
+    await sleep(60);
+    if(i<3) {
+      assert.equal(first.room.round,2);
+      assert.equal(first.room.usedAnswers.length,i+1);
+    }
+  }
+  assert.equal(first.room.round,3,'four accepted answers change the question');
+  assert.equal(first.room.status,'playing','match continues after question changes');
+  assert.notEqual(first.room.question,questionTwo.prompt);
+  assert.equal(first.room.usedAnswers.length,0);
   const shooter=questions.find(q=>q.prompt==='اذكر لعبة شوتر أونلاين');
   assert.equal(matchDetailed(shooter,'فالورنت').answer.display,'فالورانت');
   assert.equal(matchDetailed(shooter,'فالورا').answer.display,'فالورانت');
   const fruit=questions.find(q=>q.prompt==='اذكر فاكهة');
   assert.equal(matchDetailed(fruit,'تفاخ').answer.display,'تفاح');
-  console.log('PASS: online rooms, host controls, 92 gaming categories, rarity + hearts + next-round fuse, fuzzy answers');
+  // With one heart each, the first explosion immediately ends the match
+  // and declares only the last surviving player as winner.
+  r=await a.send('createRoom',{name:'ليلى',maxPlayers:2,hearts:1,fuseMinSec:6,fuseMaxSec:6,mode:'all'});
+  assert.equal(r.ok,true);
+  r=await b.send('joinRoom',{name:'رامي',code:r.code});assert.equal(r.ok,true);
+  r=await a.send('startGame',{});assert.equal(r.ok,true);
+  await sleep(90);
+  const losingId=a.room.currentPlayerId;
+  const winnerId=losingId===a.id?b.id:a.id;
+  await sleep(6300);
+  assert.equal(a.room.status,'ended','the match ends only with one surviving player');
+  assert.equal(a.room.winnerId,winnerId,'last player with hearts wins');
+  assert.equal(a.room.players.find(p=>p.id===losingId).hearts,0,'player with no hearts is eliminated');
+  console.log('PASS: room settings authorization, continuous matches, four-answer question changes, all-failed skips, lost hearts and turn passing');
   a.close();b.close();
 }
 main().then(()=>server.kill()).catch(e=>{server.kill();console.error('FAIL',e,stderr);process.exitCode=1});

@@ -1,5 +1,6 @@
 'use strict';
 const { norm, extendAliases, lookup, matchDetailed } = require('./matcher');
+const { englishAliases } = require('./english');
 const gamingRaw = require('./gaming');
 const worldRaw = require('./world');
 const arabRaw = require('./arab');
@@ -192,7 +193,7 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
   const seen = new Set();
   const answers = [];
   for (const entry of entries) {
-    const aliases = extendAliases(entry.split('|').map(s => s.trim()).filter(Boolean));
+    const aliases = englishAliases(extendAliases(entry.split('|').map(s => s.trim()).filter(Boolean)),prompt);
     const canonical = norm(aliases[0]);
     if (!canonical || seen.has(canonical)) continue;
     seen.add(canonical);

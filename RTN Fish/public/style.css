@@ -24,6 +24,18 @@ main{max-width:1220px;padding:26px 30px 70px;margin:0 auto}.screen{display:none}
 .answer-suggestion.used{color:#ffca7a;}
 
 /* Online host controls / answer rarity v3 */
+.invite-layout.active{min-height:calc(100vh - 190px);display:grid;place-items:center}
+.invite-card{width:min(100%,490px);padding:38px;text-align:center}
+.invite-card h2{font-size:clamp(24px,4vw,34px);margin:12px 0 2px}
+.invite-card .card-eyebrow{font-size:15px}
+.invite-card p.muted{margin:4px 0 20px;font-size:13px}
+.invite-card form{display:flex;flex-direction:column;gap:12px;text-align:right}
+.invite-card label{font-size:12px;font-weight:800}
+.invite-card input{width:100%;height:54px;background:#0d1728;border:1px solid #34445c;border-radius:12px;color:#f5f8ff;padding:0 16px}
+.invite-card form .btn{width:100%;margin-top:8px}
+.invite-card>.btn.ghost{margin-top:14px;width:100%}
+.invite-error{min-height:1.3em;color:#ff9ba9;font-size:12px;line-height:1.6}
+@media(max-width:740px){.invite-card{padding:28px 20px}.invite-layout.active{min-height:calc(100vh - 120px)}}
 .extra-settings{margin-top:10px}
 .mode-setting{margin-top:10px}
 .settings-hint{font-size:11px;line-height:1.6;color:#9fb2c7;margin:8px 0 16px}

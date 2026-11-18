@@ -40,12 +40,26 @@
           <button id="createBtn" class="btn primary">إنشاء غرفة <span>↗</span></button></div>
         <div class="or-line"><span>أو</span></div>
         <label for="roomCodeInput">انضم إلى أصدقائك</label><div class="join-row"><input id="roomCodeInput" type="text" maxlength="4" dir="ltr" spellcheck="false" placeholder="ABCD" autocapitalize="characters" /><button id="joinBtn" class="btn secondary">دخول</button></div>
-        <p class="footnote">اللعبة بالعربية، بما فيها الأسئلة وقبول الإجابات.</p>
+        <p class="footnote">الأسئلة بالعربي، وتقدر تجاوب بالعربي أو بالإنكليزي.</p>
+      </div>
+    </section>
+    <section id="invite" class="screen invite-layout">
+      <div class="card invite-card">
+        <div class="card-eyebrow">وصلك رابط دعوة 🎉</div>
+        <h2>انضم إلى غرفة <bdi id="inviteCode">----</bdi></h2>
+        <p id="inviteStatus" class="muted">اكتب اسمك للانضمام إلى الغرفة</p>
+        <form id="inviteForm">
+          <label for="inviteName">اسم اللاعب</label>
+          <input id="inviteName" type="text" maxlength="18" placeholder="اكتب اسمك هنا" autocomplete="nickname" required />
+          <button id="inviteJoinBtn" class="btn primary" type="submit">دخول الغرفة مباشرة <span>←</span></button>
+        </form>
+        <p id="inviteError" class="invite-error" role="alert" aria-live="polite"></p>
+        <button id="inviteBackBtn" class="btn ghost" type="button">العودة للصفحة الرئيسية</button>
       </div>
     </section>
     <section id="lobby" class="screen lobby-layout">
       <div class="page-head"><div><div class="eyebrow">غرفتك الخاصة</div><h2>جاهزين للمنافسة؟</h2><p class="muted">شارك الرمز مع أصحابك، وكل واحد بيفوت من جهازه.</p></div><button class="btn ghost leave-btn">مغادرة الغرفة</button></div>
-      <div class="lobby-grid"><div class="card room-code-panel"><div class="card-eyebrow">رمز الغرفة</div><div class="huge-code" id="lobbyCode">----</div><button id="copyBtn" class="btn primary">نسخ رابط الدعوة <span>⎘</span></button><div class="divider"></div><div class="section-caption">طريقة اللعب</div><div class="rule"><span>1</span><div>لما يجي دورك، جاوب بالعربي ولو كتبت جزء من الكلمة أو مرادفها. بتشوف التصحيح فورًا.</div></div><div class="rule"><span>2</span><div>السمكة بتنتقل للاعب اللي بعدك. وقت الانفجار سري!</div></div><div class="rule"><span>3</span><div>كل كلمة إلها ندرة ونقاط: رير تعطي وقت، إيبيك وقت أكثر، وليجندري تعطي قلب ووقت!</div></div></div>
+      <div class="lobby-grid"><div class="card room-code-panel"><div class="card-eyebrow">رمز الغرفة</div><div class="huge-code" id="lobbyCode">----</div><button id="copyBtn" class="btn primary">نسخ رابط الدعوة <span>⎘</span></button><div class="divider"></div><div class="section-caption">طريقة اللعب</div><div class="rule"><span>1</span><div>جاوب بالعربي أو بالإنكليزي. كل 4 إجابات صحيحة مختلفة بتغيّر السؤال تلقائيًا.</div></div><div class="rule"><span>2</span><div>إذا انفجرت السمكة عندك بتخسر قلب، وبينتقل الدور للي بعدك. السؤال بيكمل.</div></div><div class="rule"><span>3</span><div>المباراة ما بتنتهي إلا لما يبقى لاعب واحد معه قلوب، وهو الفائز!</div></div></div>
       <div class="lobby-main"><div class="card host-settings" id="hostSettingsPanel" hidden><div class="players-heading"><h3>إعدادات الهوست</h3><span>قبل بدء اللعبة</span></div>
         <div class="host-grid"><div><label for="hostMaxPlayers">عدد اللاعبين</label><select id="hostMaxPlayers"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="10">10</option></select></div>
         <div><label for="hostHearts">القلوب</label><select id="hostHearts"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
@@ -56,14 +70,14 @@
         <div class="card lobby-players"><div class="players-heading"><h3>اللاعبين</h3><span id="lobbyCount">0 / 6</span></div><div class="player-tiles" id="lobbyPlayerList"></div><div class="lobby-bottom"><p class="settings-summary" id="lobbySettingsSummary"></p><p id="waitingText" class="muted">بانتظار اللاعبين...</p><button id="startBtn" class="btn primary">ابدأ اللعبة <span>←</span></button></div></div></div></div>
     </section>
     <section id="game" class="screen game-layout">
-      <div class="page-head game-head"><div><div class="eyebrow"><bdi>RTN Fish</bdi> <span class="sep">/</span> <span id="roundLabel">الجولة 1</span></div><h2 id="gameHeadline">الجواب عندك!</h2></div><button class="btn ghost leave-btn">خروج</button></div>
+      <div class="page-head game-head"><div><div class="eyebrow"><bdi>RTN Fish</bdi> <span class="sep">/</span> <span id="roundLabel">السؤال 1</span></div><h2 id="gameHeadline">الجواب عندك!</h2></div><button class="btn ghost leave-btn">خروج</button></div>
       <div class="game-grid"><div class="game-card card"><div class="prompt-kicker">الفئة الحالية</div><div id="gameQuestion" class="big-question">اذكر فاكهة</div><div class="holder-chip" id="holderChip">انتظر دورك</div>
         <div class="rarity-legend" aria-label="درجات ندرة الكلمات"><span class="rarity common">كومون · 10</span><span class="rarity uncommon">أنكومون · 20</span><span class="rarity rare">رير · 35</span><span class="rarity epic">إيبيك · 55</span><span class="rarity legendary">ليجندري · 85</span></div>
         <div class="game-fish-wrap"><div class="ring-back"></div><svg class="game-fish" viewBox="0 0 360 300" aria-hidden="true"><use href="#none"/><defs><radialGradient id="gameBody" cx="38%" cy="25%" r="80%"><stop offset="0" stop-color="#ffdf95"/><stop offset=".72" stop-color="#ffbd5e"/><stop offset="1" stop-color="#db8158"/></radialGradient></defs><g class="game-fish-shape"><path d="M285 133C323 97 336 110 321 155C341 199 309 205 286 180" fill="#e9a75a"/><path d="M132 53 124 23 160 44M190 41 205 17 223 51M246 72 278 58 273 94M88 114 52 102 65 139M98 208 71 234 123 230M198 239 209 269 224 233" fill="#f5af5d" stroke="#e89b56" stroke-width="6" stroke-linejoin="round"/><ellipse cx="181" cy="149" rx="116" ry="108" fill="url(#gameBody)" stroke="#eea25b" stroke-width="7"/><ellipse cx="142" cy="132" rx="12" ry="16" fill="#2f293b"/><ellipse cx="221" cy="132" rx="12" ry="16" fill="#2f293b"/><circle cx="146" cy="127" r="4" fill="white"/><circle cx="225" cy="127" r="4" fill="white"/><path d="M171 173Q183 188 197 173" stroke="#8a4c53" stroke-width="6" stroke-linecap="round" fill="none"/><ellipse cx="126" cy="175" rx="22" ry="13" fill="#ea8b71" opacity=".5"/><ellipse cx="241" cy="175" rx="22" ry="13" fill="#ea8b71" opacity=".5"/></g></svg></div>
         <div id="timerCaption" class="timer-caption">المؤقت مخفي… لا تتأخر!</div>
         <div class="reward-note">رير +3 ثوانٍ · إيبيك +5 ثوانٍ · ليجندري +7 ثوانٍ وقلب · كل 100 نقطة = قلب</div>
-        <form id="answerForm" class="answer-form"><input id="answerInput" type="text" maxlength="70" placeholder="اكتب جوابك حتى لو تقريبي…" autocomplete="off" spellcheck="false" enterkeyhint="send" disabled /><button class="btn primary" id="answerBtn" type="submit" disabled>جاوب ومرّر <span>←</span></button></form><div class="answer-suggestion" id="answerSuggestion" aria-live="polite"></div><div class="answer-feedback" id="answerFeedback" role="status" aria-live="polite"> </div>
-      </div><aside class="game-sidebar"><div class="card sidebar-card"><div class="players-heading"><h3>الحلبة</h3><span id="gameCount">0 لاعبين</span></div><div id="gamePlayerList" class="game-player-list"></div></div><div class="card history-card"><div class="players-heading"><h3>الإجابات المستخدمة</h3><span id="usedCount">0</span></div><div id="usedList" class="chips"><span class="muted">لسه ما في إجابات</span></div></div><div class="activity" id="activityText"> </div></aside></div>
+        <form id="answerForm" class="answer-form"><input id="answerInput" type="text" maxlength="70" placeholder="إجابة بالعربي أو English…" autocomplete="off" spellcheck="false" enterkeyhint="send" disabled /><button class="btn primary" id="answerBtn" type="submit" disabled>جاوب ومرّر <span>←</span></button></form><div class="answer-suggestion" id="answerSuggestion" aria-live="polite"></div><div class="answer-feedback" id="answerFeedback" role="status" aria-live="polite"> </div>
+      </div><aside class="game-sidebar"><div class="card sidebar-card"><div class="players-heading"><h3>الحلبة</h3><span id="gameCount">0 لاعبين</span></div><div id="gamePlayerList" class="game-player-list"></div></div><div class="card history-card"><div class="players-heading"><h3>إجابات هذا السؤال</h3><span id="usedCount">0 / 4</span></div><div id="usedList" class="chips"><span class="muted">لسه ما في إجابات</span></div></div><div class="activity" id="activityText"> </div></aside></div>
     </section>
     <section id="ended" class="screen finished-screen"><div class="card result-card"><div class="trophy">✦</div><div class="eyebrow">نهاية اللعبة</div><h2 id="winnerName">لدينا فائز!</h2><p class="muted" id="winnerSubtitle">انتهت المنافسة، والجولة القادمة بانتظاركم.</p><div id="finalScores" class="final-scores"></div><button id="rematchBtn" class="btn primary">العبوا مرة ثانية <span>↻</span></button><button class="btn ghost leave-btn">مغادرة الغرفة</button></div></section>
   </main>

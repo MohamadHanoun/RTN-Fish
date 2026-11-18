@@ -4,6 +4,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { questions, matchDetailed, norm } = require('../data/questions');
+const checkTranslation=(prompt,typed,expected)=>{
+  const q=questions.find(question=>question.prompt===prompt);
+  assert(q,`missing question: ${prompt}`);
+  assert.equal(matchDetailed(q,typed)?.answer.display,expected,`translation mismatch: ${typed}`);
+};
 
 const countries = [
   'السعودية', 'مصر', 'سوريا', 'العراق', 'الأردن', 'فلسطين', 'لبنان',
@@ -33,5 +38,17 @@ const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8
 assert(app.includes("new Intl.NumberFormat('en-US-u-nu-latn')"), 'live scores must use Latin digits');
 assert(!/[٠-٩۰-۹]/.test(html), 'static HTML must not show Eastern Arabic digits');
 assert(html.includes(`${questions.length} فئة`), 'home page question count must be current');
+for(const [prompt,english,arabic] of [
+  ['اذكر حيوانًا أليفًا','dog','كلب'],
+  ['اذكر حيوانًا أليفًا','cat','قط'],
+  ['اذكر فاكهة','apple','تفاح'],
+  ['اذكر دولة عربية','Egypt','مصر'],
+  ['اذكر مدينة عربية','Cairo','القاهرة'],
+  ['اذكر لونًا','red','أحمر'],
+  ['اذكر معلمًا أو مكانًا مشهورًا في مصر','pyramids','أهرامات الجيزة']
+])checkTranslation(prompt,english,arabic);
+assert(html.includes('id="inviteForm"') && html.includes('id="inviteName"'), 'invite needs a name-only entry form');
+assert(app.includes('enterInviteRoom(true)'), 'saved-name invite must autojoin');
+assert(app.includes("$('hostSettingsPanel').hidden = !isHost"), 'guest controls must stay hidden');
 
-console.log(`PASS: ${questions.length} unique question categories, ${countries.length} Arab countries, accepted answers, Latin digits`);
+console.log(`PASS: ${questions.length} question categories, ${countries.length} Arab countries, Arabic/English answers, invite UI, Latin digits`);
