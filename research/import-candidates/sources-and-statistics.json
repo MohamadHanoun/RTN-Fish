@@ -1,0 +1,83 @@
+{
+  "created_at": "2026-11-18",
+  "stage": "research_candidate_only",
+  "repo_branch": "research/data-catalog-2026-11-18",
+  "total_candidate_records": 61159,
+  "counts": {
+    "wordnet_concepts": 9916,
+    "wordnet_nouns": 6884,
+    "wordnet_other": 3032,
+    "wordnet_arabic_lemma_rows": 37335,
+    "wordnet_english_lemma_rows_in_matched_concepts": 21556,
+    "geonames_places": 34180,
+    "geonames_cities_with_arabic_script_names": 11146,
+    "geonames_arab_states_places": 1617,
+    "geonames_arab_states_with_arabic_script_names": 1035,
+    "geonames_arabic_script_variants_staged": 22096,
+    "geonames_latin_script_variants_staged": 200247,
+    "wiktionary_arabic_entries": 16815,
+    "wikidata_country_qids": 248
+  },
+  "not_merged_into_main": true,
+  "not_loaded_by_live_game": true,
+  "warning": "These are not 61K accepted answers. They are raw bilingual lexical concepts, place-name records, dictionary definitions, and encyclopedia IDs awaiting review; never auto-accept all.",
+  "sources": [
+    {
+      "key": "awn2+pwn30",
+      "category": "lexical-semantic dictionary",
+      "name": "Arabic WordNet v2 via Open Multilingual WordNet and Princeton WordNet 3.0",
+      "url": "https://github.com/omwn/omw-data",
+      "files": [
+        "wns/arb/wn-data-arb.tab",
+        "wns/eng/wn-data-eng.tab"
+      ],
+      "source_blobs": [
+        "ddcdc8b41b67c762bfad4c727b3e9c6b31340f6a",
+        "4ddc0bdeba3323afc6e264243a17bba7bbf0b07a"
+      ],
+      "licenses": [
+        "CC BY-SA 3.0 (Arabic WordNet)",
+        "Princeton WordNet license"
+      ],
+      "warning": "Synsets can have senses that cannot be substituted indiscriminately in a game category."
+    },
+    {
+      "key": "geonames",
+      "category": "gazetteer",
+      "name": "GeoNames",
+      "url": "https://www.geonames.org/",
+      "mirror": "https://github.com/Stellarium/stellarium-data/blob/master/geonames/cities15000.txt",
+      "source_blob": "70db77158745e57b1d2865612e27edeb33d9ed7b",
+      "license": "CC BY 4.0",
+      "warning": "Arabic-script aliases may be dialectal, historical, or other Arabic-script languages; require contextual validation."
+    },
+    {
+      "key": "wiktionary-en",
+      "category": "dictionary descriptions",
+      "name": "English Wiktionary via Wiktextract/Kaikki, packaged by Luraty",
+      "url": "https://github.com/Luraty/language-packs",
+      "source_file": "languages/fusha/out/dictionary.wiktionary-en.json",
+      "source_blob": "20f84f54a36d85147e9e061c6df81c46301172cd",
+      "source_date": "2026-09-12",
+      "license": "CC BY-SA 4.0",
+      "warning": "English senses are definitions, not exact synonyms; do not count whole definitions as answers."
+    },
+    {
+      "key": "wikidata-qid",
+      "category": "encyclopedia entity identifiers",
+      "name": "Wikidata QIDs referenced by country-codes",
+      "url": "https://github.com/datasets/country-codes",
+      "source_file": "data/country-codes.csv",
+      "license": "CC0 for Wikidata IDs only",
+      "warning": "The full Wikidata entities were NOT retrieved. No UNTERM or restricted country-name columns were copied."
+    }
+  ],
+  "next_steps": [
+    "Deduplicate by concept and context rather than string alone",
+    "Build category-specific candidate selectors",
+    "Review Arabic and English aliases and disambiguation",
+    "Keep BY-SA content in separately attributed datasets",
+    "Run false-positive/false-negative evaluations against current questions before any activation",
+    "Discuss with user before integrating into main branch or changing gameplay"
+  ]
+}
