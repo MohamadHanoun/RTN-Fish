@@ -64,7 +64,9 @@
     room.players.forEach((p,i) => {
       // Players sit at equally spaced, stable places around the central fish.
       const angle = -Math.PI/2 + (2*Math.PI*i/count);
-      const x = 50 + 37*Math.cos(angle), y = 50 + 37*Math.sin(angle);
+      // Keep bottom seats and their last-word bubbles above the answer dock.
+      const vertical = Math.sin(angle);
+      const x = 50 + 37*Math.cos(angle), y = 50 + (vertical > 0 ? 28 : 37)*vertical;
       const current = p.id === room.currentPlayerId;
       let seat = existing.get(p.id);
       if(!seat) {
