@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node tests/integration.js"
+    "test": "node tests/content.js && node tests/integration.js"
   },
   "engines": {
     "node": ">=18"

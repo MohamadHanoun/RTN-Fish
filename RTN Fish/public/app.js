@@ -4,7 +4,9 @@
   const socket = io({ reconnectionAttempts: 10 });
   const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1 };
   let toastTimeout = null, feedbackTimeout = null, actx = null, previewTimer = null, previewSeq = 0;
-  const arabicNumber = n => Number(n || 0).toLocaleString('en-US');
+  // Always show Western digits (0–9), even if the browser uses an Arabic locale.
+  const numberFormatter = new Intl.NumberFormat('en-US-u-nu-latn');
+  const formatNumber = n => numberFormatter.format(Number(n || 0));
   function beep(kind = 'pass') {
     if (!state.sound) return;
     try {
@@ -118,18 +120,18 @@
   }
   function updateLobby(room) {
     $('lobbyCode').textContent = room.code;
-    $('lobbyCount').textContent = `${arabicNumber(room.players.length)} / ${arabicNumber(room.maxPlayers)}`;
+    $('lobbyCount').textContent = `${formatNumber(room.players.length)} / ${formatNumber(room.maxPlayers)}`;
     $('lobbyPlayerList').replaceChildren();
     room.players.forEach((p,i) => {
       const tile = node('div','player-tile');
       tile.append(node('span','avatar',p.name[0] || '؟'));
       const info = node('div');info.append(node('strong','',p.name));
-      info.append(node('small','',p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${arabicNumber(i + 1)}`));
+      info.append(node('small','',p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`));
       tile.append(info);$('lobbyPlayerList').append(tile);
     });
     for(let i=room.players.length;i<room.maxPlayers;i++) {
       const tile = node('div','player-tile empty');tile.append(node('span','avatar','+'));
-      const info=node('div');info.append(node('strong','',`مقعد ${arabicNumber(i+1)}`));info.append(node('small','','فارغ'));
+      const info=node('div');info.append(node('strong','',`مقعد ${formatNumber(i+1)}`));info.append(node('small','','فارغ'));
       tile.append(info);$('lobbyPlayerList').append(tile);
     }
     const isHost = room.hostId === socket.id;
@@ -141,7 +143,7 @@
     }
     const mode = room.settings.mode === 'gaming' ? 'Gaming فقط'
       : room.settings.mode === 'mostlyGaming' ? 'Gaming أغلب الوقت' : 'كل الأسئلة';
-    $('lobbySettingsSummary').textContent = `الإعدادات: ${room.settings.hearts} قلوب · من ${room.settings.fuseMinSec} إلى ${room.settings.fuseMaxSec} ثانية · ${mode}`;
+    $('lobbySettingsSummary').textContent = `الإعدادات: ${formatNumber(room.settings.hearts)} قلوب · من ${formatNumber(room.settings.fuseMinSec)} إلى ${formatNumber(room.settings.fuseMaxSec)} ثانية · ${mode}`;
     $('startBtn').hidden = !isHost;
     $('startBtn').disabled = room.players.length < 2;
     $('waitingText').textContent = isHost
@@ -151,7 +153,7 @@
   function updateGame(room) {
     const mine = room.currentPlayerId === socket.id;
     const holder = room.players.find(p => p.id === room.currentPlayerId);
-    $('roundLabel').textContent = `الجولة ${arabicNumber(room.round)}`;
+    $('roundLabel').textContent = `الجولة ${formatNumber(room.round)}`;
     $('gameHeadline').textContent = mine ? 'السمكة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
     $('holderChip').textContent = mine ? 'دورك الآن: جاوب ومرّر بسرعة' : `الدور عند ${holder?.name || 'لاعب آخر'}`;
@@ -159,7 +161,7 @@
     $('answerInput').disabled = !mine;
     $('answerBtn').disabled = !mine;
     $('timerCaption').textContent = mine ? 'أسرع! ما حدا بيعرف متى تنفجر' : 'المؤقت مخفي… لا تتأخر لما يجي دورك';
-    $('gameCount').textContent = `${arabicNumber(room.players.filter(p => p.hearts > 0).length)} ناجين`;
+    $('gameCount').textContent = `${formatNumber(room.players.filter(p => p.hearts > 0).length)} ناجين`;
     $('gamePlayerList').replaceChildren();
     room.players.forEach(p => {
       const el = node('div',`game-player ${p.id === room.currentPlayerId ? 'is-active' : ''} ${p.hearts <= 0 ? 'is-dead' : ''}`);
@@ -169,13 +171,13 @@
       if(p.id===socket.id) title.append(node('span','you-chip',' (أنت)'));
       info.append(title);
       info.append(node('div','hearts',('♥ '.repeat(p.hearts)||'خرج من اللعبة').trim()));
-      const stats=node('div','player-stats',`${arabicNumber(p.score)} نقطة · ${arabicNumber(p.correct)} إجابة`);
+      const stats=node('div','player-stats',`${formatNumber(p.score)} نقطة · ${formatNumber(p.correct)} إجابة`);
       info.append(stats);
-      if (p.timeBonus) info.append(node('div','time-bank',`+${p.timeBonus} ثواني لما تبدأ جولة`));
+      if (p.timeBonus) info.append(node('div','time-bank',`+${formatNumber(p.timeBonus)} ثواني لما تبدأ جولة`));
       const bar=node('div','chargebar');const fill=node('span');fill.style.width=`${Math.max(0,Math.min(100,p.charge))}%`;bar.append(fill);info.append(bar);
       el.append(info); $('gamePlayerList').append(el);
     });
-    $('usedCount').textContent = arabicNumber(room.usedAnswers.length);
+    $('usedCount').textContent = formatNumber(room.usedAnswers.length);
     $('usedList').replaceChildren();
     if (!room.usedAnswers.length) $('usedList').append(node('span','muted','لسه ما في إجابات'));
     else room.usedAnswers.forEach(a => {
@@ -199,9 +201,9 @@
     $('finalScores').replaceChildren();
     scores.forEach((p,i) => {
       const row=node('div','final-entry');
-      row.append(node('span','',`${arabicNumber(i+1)}.`));
+      row.append(node('span','',`${formatNumber(i+1)}.`));
       row.append(node('strong','',p.name));
-      row.append(node('span','',`${arabicNumber(p.score)} نقطة · ${arabicNumber(p.correct)} إجابة · ${arabicNumber(p.hearts)} قلوب`));
+      row.append(node('span','',`${formatNumber(p.score)} نقطة · ${formatNumber(p.correct)} إجابة · ${formatNumber(p.hearts)} قلوب`));
       $('finalScores').append(row);
     });
     $('rematchBtn').hidden = room.hostId !== socket.id;
@@ -248,10 +250,10 @@
         el.classList.toggle('used', Boolean(suggestion?.used));
         if (!suggestion) { el.textContent = ''; return; }
         if (suggestion.used) el.textContent = `مستخدم من قبل: ${suggestion.display} — جرّب جواب تاني`;
-        else if (suggestion.kind === 'typo') el.textContent = `تخميني: ${suggestion.display} · ${suggestion.rarityLabel} (+${suggestion.points}) ✓`;
-        else if (suggestion.kind === 'partial') el.textContent = `كمّلنا الكلمة: ${suggestion.display} · ${suggestion.rarityLabel} (+${suggestion.points}) ✓`;
-        else if (suggestion.kind === 'synonym') el.textContent = `مرادف مقبول: ${suggestion.display} · ${suggestion.rarityLabel} (+${suggestion.points}) ✓`;
-        else el.textContent = `جواب معروف: ${suggestion.display} · ${suggestion.rarityLabel} (+${suggestion.points}) ✓`;
+        else if (suggestion.kind === 'typo') el.textContent = `تخميني: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
+        else if (suggestion.kind === 'partial') el.textContent = `كمّلنا الكلمة: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
+        else if (suggestion.kind === 'synonym') el.textContent = `مرادف مقبول: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
+        else el.textContent = `جواب معروف: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
         el.classList.add('rarity-preview',suggestion.rarity);
       });
     }, 150);
@@ -263,7 +265,7 @@
     request('submitAnswer', {answer}, ({answer:value, points, heartsGained, gainedTime, rarityLabel, correction}) => {
       $('answerInput').value = '';
       clearPreview();
-      feedback(`${correction === 'exact' ? 'ممتاز!' : 'خمّنا جوابك!'} ${value} — ${rarityLabel} (+${points} نقطة)${heartsGained ? ` +${heartsGained} قلب!` : ''}${gainedTime ? ` +${gainedTime} ثواني للمستقبل!` : ''}`, 'success');
+      feedback(`${correction === 'exact' ? 'ممتاز!' : 'خمّنا جوابك!'} ${value} — ${rarityLabel} (+${formatNumber(points)} نقطة)${heartsGained ? ` +${formatNumber(heartsGained)} قلب!` : ''}${gainedTime ? ` +${formatNumber(gainedTime)} ثواني للمستقبل!` : ''}`, 'success');
     });
   }
   socket.on('connect', () => {
