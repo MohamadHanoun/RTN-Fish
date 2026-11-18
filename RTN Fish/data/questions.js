@@ -1,9 +1,10 @@
 'use strict';
 const { norm, extendAliases, lookup, matchDetailed } = require('./matcher');
-const { englishAliases } = require('./english');
+const { englishAliases, registerSharedAliases } = require('./english');
 const gamingRaw = require('./gaming');
 const worldRaw = require('./world');
 const arabRaw = require('./arab');
+const { inherit, additional } = require('./expansions');
 // All question prompts and answer lists below are original Arabic content.
 // Earlier entries are typically more familiar; later ones are given a higher bonus.
 // Optional answer aliases are separated by |.
@@ -188,8 +189,44 @@ const rarityLevels = [
 const gamingPrompts = new Set(gamingRaw.map(q => q[0]));
 const legacyGamingPattern = /لعبة فيديو|جهاز ألعاب|شركة ألعاب|لعبة ورق|لعبة جماعية|لعبة لوحية/;
 const allRaw = [...raw, ...worldRaw, ...arabRaw, ...gamingRaw];
+registerSharedAliases(allRaw);
+const supplementalEntries = new Map(allRaw.map(([prompt, serialized]) => [prompt,
+  [...serialized.split(','),...(additional[prompt] ? additional[prompt].split(',') : [])]]));
+
+function themeFor(prompt, category, source) {
+  if (category === 'gaming') {
+    if (/شخصية|بطل|بوكيمون|ليجند|ستريمر|لاعب/.test(prompt)) return 'gaming-characters';
+    if (/سلاح|بطاقة|بلوك|عنصر|أداة|موب|وحش|بيرك/.test(prompt)) return 'gaming-items';
+    if (/خريطة|ماب|مكان|مدينة|بايوم/.test(prompt)) return 'gaming-worlds';
+    if (/مصطلح|دور|نوع|منصة|شركة|بطولة|فريق|إي سبورت|ديسكورد/.test(prompt)) return 'gaming-culture';
+    return 'gaming-titles';
+  }
+  if (/أكلة|أكلات|طبق|طعام|فاكهة|خضار|حلوى|جبن|خبز|توابل|بهارات|مكسرات|صلصة|مشروب|فطور/.test(prompt)) return 'food';
+  if (/مدينة|دولة|بلد|بلدان|عاصمة|نهر|بحر|محيط|جبل|جزيرة|شلال|صحراء|بحيرة|مضيق|قناة|معلم|مكان مشهور/.test(prompt)) return 'geography';
+  if (/حيوان|طائر|أسماك|سمك|حشرة|ديناصور|قطط برية|زهور|نبات|شجرة/.test(prompt)) return 'nature';
+  if (/كرة القدم|رياضة|رياضي|لاعب كرة|نادي كرة|سباق|الجيم|هواية/.test(prompt)) return 'sports';
+  if (/فيلم|مسلسل|كرتون|أنمي|ديزني|سبونج بوب|شخصية خارقة|موسيقي|آلة موسيقية/.test(prompt)) return 'entertainment';
+  if (/هاتف|كمبيوتر|برمجة|إنترنت|تطبيق|متصفح|ملف|شركة تقنية|تقنية|شاشة/.test(prompt)) return 'technology';
+  if (/العربي|العربية|عربي|سورية|مصرية|خليجية|مغربية/.test(prompt) || source === 'arab') return 'arab-culture';
+  if (/جسم|عظام|الحواس|عضو|طب|مستشفى|طبيب|مرض/.test(prompt)) return 'health-science';
+  if (/كوكب|طقس|طبيعية|معدن|صخر|طاقة|مغناطيس/.test(prompt)) return 'science';
+  if (/بيت|غرفة|مدرسة|مطبخ|حديقة|ملابس|سفر|مطار|وظيفة|مهنة/.test(prompt)) return 'everyday';
+  return source === 'world' ? 'world-culture' : 'general';
+}
+
 const questions = allRaw.map(([prompt, serialized], idx) => {
+  const source = idx < raw.length ? 'general'
+    : idx < raw.length + worldRaw.length ? 'world'
+      : idx < raw.length + worldRaw.length + arabRaw.length ? 'arab' : 'gaming';
   const entries = serialized.split(',').map(s => s.trim()).filter(Boolean);
+  for(const rule of inherit[prompt] || []) {
+    for(const [otherPrompt, values] of supplementalEntries) {
+      if(otherPrompt === prompt || !rule.test(otherPrompt)) continue;
+      if(prompt === 'اذكر لعبة فيديو' && !gamingPrompts.has(otherPrompt)) continue;
+      entries.push(...values);
+    }
+  }
+  if(additional[prompt]) entries.push(...additional[prompt].split(','));
   const seen = new Set();
   const answers = [];
   for (const entry of entries) {
@@ -202,6 +239,7 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
     const level = rarityLevels[tier];
     answers.push({ display: aliases[0], aliases, value: level.points, rarity: level.key, rarityLabel: level.label, timeBonus: level.timeBonus });
   }
-  return { id: idx + 1, prompt, category: gamingPrompts.has(prompt) || legacyGamingPattern.test(prompt) ? 'gaming' : 'mixed', answers };
+  const category = gamingPrompts.has(prompt) || legacyGamingPattern.test(prompt) ? 'gaming' : 'mixed';
+  return { id: idx + 1, prompt, category, theme: themeFor(prompt,category,source), answers };
 });
 module.exports = { questions, lookup, norm, matchDetailed, rarityLevels };

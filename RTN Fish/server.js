@@ -30,29 +30,31 @@ function roomCode() {
 function activePlayers(room) { return room.players.filter(p => p.hearts > 0); }
 function parseSettings(data, current = {}) {
   const hearts = Number(data?.hearts ?? current.hearts ?? 3);
-  const maxPlayers = Number(data?.maxPlayers ?? current.maxPlayers ?? 6);
+  // Rooms grow automatically as friends join; a host never has to choose capacity.
+  const maxPlayers = 10;
   const fuseMinSec = Number(data?.fuseMinSec ?? current.fuseMinSec ?? 12);
   const fuseMaxSec = Number(data?.fuseMaxSec ?? current.fuseMaxSec ?? 30);
   const mode = String(data?.mode ?? current.mode ?? 'all');
-  if (![hearts,maxPlayers,fuseMinSec,fuseMaxSec].every(Number.isInteger)
-      || hearts < 1 || hearts > 8 || maxPlayers < 2 || maxPlayers > 10
+  if (![hearts,fuseMinSec,fuseMaxSec].every(Number.isInteger)
+      || hearts < 1 || hearts > 8
       || fuseMinSec < MIN_TIME || fuseMaxSec > MAX_TIME || fuseMaxSec < fuseMinSec
       || !['all','gaming','mostlyGaming'].includes(mode)) return null;
   return { hearts, maxPlayers, fuseMinSec, fuseMaxSec, mode };
 }
 function serialize(room) {
+  const question=questions[room.questionId-1];
   return {
     code: room.code, status: room.status, hostId: room.hostId,
     settings: {...room.settings}, maxPlayers: room.settings.maxPlayers,
     hearts: room.settings.hearts, maxHearts: room.maxHearts,
-    players: room.players.map(({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts}) =>
-      ({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts})),
+    players: room.players.map(({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer}) =>
+      ({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer})),
     currentPlayerId: room.currentPlayerId,
-    question: questions.find(q => q.id === room.questionId)?.prompt ?? null,
+    question: question?.prompt ?? null, theme:question?.theme ?? null,
     usedAnswers: room.usedDisplay.slice(-30), usedCount: room.used.size,
     round: room.round, answerGoal: room.answerGoal, recent: room.recent, winnerId: room.winnerId,
-    // The precise fuse duration and end time must stay hidden on the server.
-    phaseStarted: room.phaseStarted
+    phaseStarted: room.phaseStarted, fuseEndsAt: room.fuseEndsAt,
+    fuseDurationMs: room.fuseDurationMs, serverNow: Date.now()
   };
 }
 function broadcast(room) { io.to(room.code).emit('state',serialize(room)); }
@@ -69,7 +71,7 @@ function endGame(room) {
   emitFeed(room,'win',winner?`${winner.name} فاز باللعبة!`:'انتهت اللعبة');
 }
 function setFuse(room,ms) {
-  clearFuse(room);room.fuseEndsAt=Date.now()+ms;
+  clearFuse(room);room.fuseDurationMs=ms;room.fuseEndsAt=Date.now()+ms;
   room.timer=setTimeout(()=>explode(room.code),ms);
 }
 function nextActive(room,previousId) {
@@ -90,8 +92,29 @@ function chooseQuestion(room) {
     // Don't repeat until relevant pool is exhausted; reset history if necessary.
     room.questionHistory=[];candidates=pool;
   }
-  const question=candidates[crypto.randomInt(candidates.length)];
+  // Pick a topic that hasn't appeared recently. Balance between topics instead
+  // of letting a large collection of near-identical prompts dominate the game.
+  const recentThemes = room.themeHistory.slice(-3);
+  const withoutRecent = candidates.filter(q=>!recentThemes.includes(q.theme));
+  if(withoutRecent.length) candidates=withoutRecent;
+  else {
+    const withoutLast = candidates.filter(q=>q.theme!==room.themeHistory.at(-1));
+    if(withoutLast.length) candidates=withoutLast;
+  }
+  const byTheme=new Map();
+  for(const q of candidates) {
+    if(!byTheme.has(q.theme))byTheme.set(q.theme,[]);
+    byTheme.get(q.theme).push(q);
+  }
+  const leastUsed=Math.min(...[...byTheme.keys()].map(theme=>room.themeCounts[theme]||0));
+  const diverseThemes=[...byTheme.keys()].filter(theme=>(room.themeCounts[theme]||0)<=leastUsed+1);
+  const theme=diverseThemes[crypto.randomInt(diverseThemes.length)];
+  const choices=byTheme.get(theme);
+  const question=choices[crypto.randomInt(choices.length)];
   room.questionHistory.push(question.id);
+  room.themeHistory.push(question.theme);
+  if(room.themeHistory.length>8)room.themeHistory.shift();
+  room.themeCounts[question.theme]=(room.themeCounts[question.theme]||0)+1;
   return question;
 }
 function startFuseFor(room,player,applyBonus=false) {
@@ -162,7 +185,7 @@ function leave(socket,notify=true) {
 }
 function ackSafe(cb,response){if(typeof cb==='function')cb(response);}
 function makePlayer(socket,name,hearts,avatar){
-  return {id:socket.id,name:safeName(name),avatar:avatar || chooseAvatar(),hearts,charge:0,correct:0,score:0,timeBonus:0,
+  return {id:socket.id,name:safeName(name),avatar:avatar || chooseAvatar(),hearts,charge:0,correct:0,score:0,timeBonus:0,lastAnswer:'',
     rarityCounts:{common:0,uncommon:0,rare:0,epic:0,legendary:0}};
 }
 
@@ -175,8 +198,8 @@ io.on('connection',socket=>{
     const code=roomCode();
     const room={code,settings,maxHearts:Math.min(MAX_HEARTS,settings.hearts+3),hostId:socket.id,
       status:'lobby',players:[makePlayer(socket,data?.name,settings.hearts)],used:new Set(),
-      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],round:0,answerGoal:0,currentPlayerId:null,
-      fuseEndsAt:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
+      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],themeHistory:[],themeCounts:{},round:0,answerGoal:0,currentPlayerId:null,
+      fuseEndsAt:null,fuseDurationMs:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
     rooms.set(code,room);socketRoom.set(socket.id,code);socket.join(code);broadcast(room);
     ackSafe(ack,{ok:true,code});
   });
@@ -198,7 +221,7 @@ io.on('connection',socket=>{
     if(!room||room.hostId!==socket.id)return ackSafe(ack,{ok:false,error:'فقط الهوست يقدر يعدّل الإعدادات'});
     if(room.status!=='lobby')return ackSafe(ack,{ok:false,error:'تغيير الإعدادات مسموح قبل بدء اللعبة'});
     const settings=parseSettings(data,room.settings);
-    if(!settings||settings.maxPlayers<room.players.length)return ackSafe(ack,{ok:false,error:'تأكد من الوقت والقلوب وعدد اللاعبين'});
+    if(!settings)return ackSafe(ack,{ok:false,error:'تأكد من الوقت والقلوب'});
     room.settings=settings;room.maxHearts=Math.min(MAX_HEARTS,settings.hearts+3);
     room.players.forEach(p=>p.hearts=settings.hearts);
     room.lastActiveAt=Date.now();broadcast(room);ackSafe(ack,{ok:true});
@@ -209,7 +232,7 @@ io.on('connection',socket=>{
     if(room.hostId!==socket.id)return ackSafe(ack,{ok:false,error:'فقط الهوست يبدأ اللعبة'});
     if(room.players.length<2)return ackSafe(ack,{ok:false,error:'تحتاج لاعبين على الأقل'});
     if(room.status==='playing')return ackSafe(ack,{ok:false,error:'اللعبة جارية'});
-    clearFuse(room);room.status='playing';room.round=0;room.questionHistory=[];room.winnerId=null;
+    clearFuse(room);room.status='playing';room.round=0;room.questionHistory=[];room.themeHistory=[];room.themeCounts={};room.winnerId=null;
     room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts,p.avatar)));
     beginQuestion(room);ackSafe(ack,{ok:true});
   });
@@ -235,13 +258,15 @@ io.on('connection',socket=>{
     if(!room||room.status!=='playing')return ackSafe(ack,{ok:false,error:'اللعبة لم تبدأ'});
     if(room.currentPlayerId!==socket.id)return ackSafe(ack,{ok:false,error:'ليس دورك الآن'});
     if(now>=room.fuseEndsAt){explode(room.code);return ackSafe(ack,{ok:false,error:'انتهى الوقت!'});}
-    const match=matchDetailed(questions[room.questionId-1],String(data?.answer??'').slice(0,80));
+    const submitted=String(data?.answer??'').replace(/[\r\n\u0000-\u001f]/g,'').trim().slice(0,70);
+    const match=matchDetailed(questions[room.questionId-1],submitted);
     if(!match)return ackSafe(ack,{ok:false,error:'ما لقينا جواب قريب، جرّب كلمة أوضح شوي'});
     const answer=match.answer,key=norm(answer.display);
     if(room.used.has(key))return ackSafe(ack,{ok:false,error:`${answer.display} مستخدمة! جرّب جواب غيره`});
     room.used.add(key);room.usedDisplay.push({display:answer.display,rarity:answer.rarity,rarityLabel:answer.rarityLabel});
     room.failedSinceAnswer.clear();
     const player=room.players.find(p=>p.id===socket.id);
+    player.lastAnswer=submitted;
     player.correct++;player.score+=answer.value;player.charge+=answer.value;
     player.rarityCounts[answer.rarity]++;
     const beforeBonus=player.timeBonus;

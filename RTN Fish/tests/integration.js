@@ -45,6 +45,7 @@ async function main(){
   let r=await a.send('createRoom',{name:'ليلى',maxPlayers:3,hearts:3,fuseMinSec:6,fuseMaxSec:6,mode:'gaming'});
   assert.equal(r.ok,true);const code=r.code;
   assert.equal(a.room.settings.mode,'gaming');
+  assert.equal(a.room.maxPlayers,10,'rooms should fill automatically without a player-count setting');
   r=await b.send('joinRoom',{name:'رامي',code});assert.equal(r.ok,true);
   await sleep(60);
   assert(a.room.players.every(p=>p.avatar),'every player gets an animal avatar');
@@ -58,6 +59,9 @@ async function main(){
   assert.equal(b.room.players[0].hearts,2,'changed hearts applied');
   r=await a.send('startGame',{});assert.equal(r.ok,true);
   await sleep(90);
+  assert(a.room.fuseEndsAt>Date.now(),'every player receives a visible server countdown');
+  assert.equal(a.room.fuseDurationMs,6000,'timer duration must be consistent with room settings');
+  assert(typeof a.room.theme==='string','questions should include their diversity theme');
   assert(a.room.players.every(p=>p.avatar===initialAvatars.get(p.id)),'avatars stay unchanged on game start');
   const first=a.room.currentPlayerId===a.id?a:b;
   const second=first===a?b:a;
@@ -65,12 +69,18 @@ async function main(){
   assert.equal(q.category,'gaming','gaming only category');
   const legendary=q.answers.find(x=>x.rarity==='legendary'&&matchDetailed(q,x.display)?.answer===x);
   assert(legendary,'legendary answer exists');
+  const questionTheme=a.room.theme;
+  r=await first.send('submitAnswer',{answer:'this is not a real answer xyzxyz'});
+  assert.equal(r.ok,false,'wrong answers must be explicitly rejected');
+  assert.equal(first.room.currentPlayerId,first.id,'wrong words must not skip the player');
+  await sleep(260);
   r=await first.send('previewAnswer',{answer:legendary.display});
   assert.equal(r.suggestion.rarity,'legendary');
   r=await first.send('submitAnswer',{answer:legendary.display});
   assert.equal(r.ok,true);assert.equal(r.rarity,'legendary');assert.equal(r.heartsGained,1);
   assert.equal(r.gainedTime,7);
   await sleep(100);
+  assert.equal(first.room.players.find(p=>p.id===first.id).lastAnswer,legendary.display,'the submitted word is shown beside the player');
   assert.equal(first.room.players.find(p=>p.id===first.id).hearts,3);
   assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,7);
   assert.equal(first.room.currentPlayerId,second.id);
@@ -94,6 +104,7 @@ async function main(){
   await sleep(6300);
   assert.equal(first.room.round,2,'all players failing must unlock the next question');
   assert.notEqual(first.room.question,initialQuestion);
+  assert.notEqual(first.room.theme,questionTheme,'consecutive questions should rotate themes when available');
   assert.equal(first.room.usedAnswers.length,0,'new question resets used answers');
   assert.equal(first.room.currentPlayerId,first.id,'pass continues around the table');
   assert.equal(first.room.players.find(p=>p.id===second.id).hearts,1);

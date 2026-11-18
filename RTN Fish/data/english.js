@@ -4,6 +4,7 @@
 // answers, so a translation shares the same points and cannot be used twice.
 // Format: Arabic names separated by |, then =>, then accepted English names.
 const { norm } = require('./matcher');
+const extraRows = require('./english-extra');
 const rows = [
   // Animals, birds, sea life and insects.
   'كلب|كلب حراسة=>dog|dogs|guard dog',
@@ -178,6 +179,7 @@ const rows = [
   'قصبة آيت بن حدو|آيت بن حدو=>ait benhaddou',
   'برج إيفل=>eiffel tower', 'سور الصين العظيم=>great wall of china',
   'تمثال الحرية=>statue of liberty', 'تاج محل=>taj mahal',
+  ...extraRows,
 ];
 
 const dictionary = new Map();
@@ -190,11 +192,46 @@ for (const row of rows) {
   }
 }
 
+// Reuse explicit English spellings from *every* category. For example, the
+// English name of a game, country or city is accepted in other questions too.
+function registerSharedAliases(sourceQuestions) {
+  for(const [, serialized] of sourceQuestions) {
+    for(const entry of serialized.split(',')) {
+      const names=entry.split('|').map(x=>x.trim()).filter(Boolean);
+      const english=names.filter(x=>/[a-z]/i.test(x) && !/[\u0600-\u06ff]/.test(x));
+      if(!english.length)continue;
+      for(const arabic of names.filter(x=>/[\u0600-\u06ff]/.test(x))) {
+        const key=norm(arabic);
+        if(key==='عمان')continue; // city Amman and country Oman are distinct
+        dictionary.set(key,[...new Set([...(dictionary.get(key)||[]),...english])]);
+      }
+    }
+  }
+}
+
+// Searchable fallback for names typed phonetically in Latin letters.
+// Explicit dictionary translations always remain the primary English aliases.
+const romanLetters = Object.freeze({
+  'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h','خ':'kh',
+  'د':'d','ذ':'dh','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d','ط':'t',
+  'ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n',
+  'ه':'h','ة':'a','و':'w','ؤ':'w','ي':'y','ى':'a','ئ':'y','ء':''
+});
+function romanize(value) {
+  return [...String(value).replace(/[\u064B-\u065F\u0640]/g,'')]
+    .map(character=>romanLetters[character] ?? character).join('')
+    .replace(/[^a-z0-9\s]/gi,'').replace(/\s+/g,' ').trim().toLowerCase();
+}
+
 function englishAliases(aliases, prompt) {
   const all = new Set(aliases);
   for (const alias of aliases) {
     const key = norm(alias);
     for (const translation of dictionary.get(key) || []) all.add(translation);
+    if(/[\u0600-\u06ff]/.test(alias) && alias.length>=3) {
+      const phonetic=romanize(alias);
+      if(phonetic.length>=3)all.add(phonetic);
+    }
     // Arabic spelling without vowel marks merges the country Oman and city Amman.
     if (key === 'عمان') {
       if (/عاصمة|مدينة|الأردن/.test(prompt)) all.add('Amman');
@@ -204,4 +241,4 @@ function englishAliases(aliases, prompt) {
   return [...all];
 }
 
-module.exports = { englishAliases };
+module.exports = { englishAliases, registerSharedAliases };

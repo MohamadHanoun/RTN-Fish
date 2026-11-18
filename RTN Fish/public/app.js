@@ -2,7 +2,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const socket = io({ reconnectionAttempts: 10 });
-  const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1 };
+  const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1, clockSkew: 0 };
   let toastTimeout = null, feedbackTimeout = null, actx = null, previewTimer = null, previewSeq = 0;
   const roomFromLink = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
   let pendingInviteCode = /^[A-Z]{4}$/.test(roomFromLink || '') ? roomFromLink : null;
@@ -16,9 +16,9 @@
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       const osc = actx.createOscillator(); const gain = actx.createGain();
       osc.connect(gain); gain.connect(actx.destination);
-      osc.type = kind === 'pop' ? 'sawtooth' : 'sine';
-      osc.frequency.setValueAtTime(kind === 'pop' ? 180 : kind === 'win' ? 520 : 560, actx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(kind === 'pop' ? 80 : 820, actx.currentTime + .16);
+      osc.type = kind === 'pop' || kind === 'wrong' ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(kind === 'pop' ? 180 : kind === 'wrong' ? 270 : kind === 'win' ? 520 : 560, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(kind === 'pop' || kind === 'wrong' ? 95 : 820, actx.currentTime + .16);
       gain.gain.setValueAtTime(.0001, actx.currentTime);
       gain.gain.exponentialRampToValueAtTime(.045, actx.currentTime + .025);
       gain.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + .19);
@@ -73,7 +73,9 @@
         seat.append(animalAvatar(p,'arena-avatar'));
         seat.append(node('span','arena-player-name'));
         seat.append(node('span','arena-player-hearts'));
+        seat.append(node('span','arena-last-word'));
         seat.append(node('span','arena-turn-star','✦'));
+        seat.append(node('span','arena-turn-label','عنده الدور'));
       }
       existing.delete(p.id);
       seat.className = `arena-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.id===socket.id?'my-seat':''}`;
@@ -83,15 +85,24 @@
       seat.title = `${p.name} · ${formatNumber(p.hearts)} قلوب · ${formatNumber(p.score)} نقطة`;
       seat.querySelector('.arena-player-name').textContent = p.name;
       seat.querySelector('.arena-player-hearts').textContent = p.hearts>0 ? `♥ ${formatNumber(p.hearts)}` : 'خرج';
+      const last = seat.querySelector('.arena-last-word');
+      last.textContent = p.lastAnswer ? `💬 ${p.lastAnswer}` : '';
+      last.dir = 'auto';
+      last.hidden = !p.lastAnswer;
       seat.querySelector('.arena-turn-star').hidden = !current;
+      seat.querySelector('.arena-turn-label').hidden = !current;
       arena.append(seat);
     });
+    const turnIndex=room.players.findIndex(p=>p.id===room.currentPlayerId);
+    $('arena').style.setProperty('--turn-rotation',`${turnIndex<0 ? 0 : 360*turnIndex/count}deg`);
+    $('arena').classList.toggle('has-turn',turnIndex>=0);
     for (const stale of existing.values()) stale.remove();
   }
   function switchScreen(screen) {
     if (state.screen !== screen) {
       state.screen = screen;
       document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === screen));
+      document.body.classList.toggle('in-game',screen === 'game');
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }
@@ -103,21 +114,22 @@
     return name;
   }
   function getName() { return saveName($('username')); }
-  function request(event, data, cb) {
-    if (!socket.connected) return toast('الاتصال مقطوع. جرّب من جديد بعد الاتصال');
+  function request(event, data, cb, onError) {
+    const fail = message => (onError || toast)(message);
+    if (!socket.connected) return fail('الاتصال مقطوع. جرّب من جديد بعد الاتصال');
     socket.timeout(6000).emit(event, data, (err, response) => {
-      if (err) return toast('لم يصل رد من السيرفر، حاول مرة ثانية');
-      if (!response?.ok) return toast(response?.error || 'حصل خطأ');
+      if (err) return fail('لم يصل رد من السيرفر، حاول مرة ثانية');
+      if (!response?.ok) return fail(response?.error || 'حصل خطأ');
       if (cb) cb(response);
     });
   }
   function getHomeSettings() {
-    return { maxPlayers: Number($('maxPlayers').value), hearts: Number($('heartsSetting').value),
+    return { hearts: Number($('heartsSetting').value),
       fuseMinSec: Number($('minTimeSetting').value), fuseMaxSec: Number($('maxTimeSetting').value),
       mode: $('modeSetting').value };
   }
   function getHostSettings() {
-    return { maxPlayers: Number($('hostMaxPlayers').value), hearts: Number($('hostHearts').value),
+    return { hearts: Number($('hostHearts').value),
       fuseMinSec: Number($('hostMinTime').value), fuseMaxSec: Number($('hostMaxTime').value),
       mode: $('hostMode').value };
   }
@@ -194,7 +206,7 @@
   }
   function updateLobby(room) {
     $('lobbyCode').textContent = room.code;
-    $('lobbyCount').textContent = `${formatNumber(room.players.length)} / ${formatNumber(room.maxPlayers)}`;
+    $('lobbyCount').textContent = `${formatNumber(room.players.length)} لاعبين`;
     $('lobbyPlayerList').replaceChildren();
     room.players.forEach((p,i) => {
       const tile = node('div','player-tile');
@@ -204,18 +216,13 @@
       info.append(node('small','',`${p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`} · ${animalName}`));
       tile.append(info);$('lobbyPlayerList').append(tile);
     });
-    for(let i=room.players.length;i<room.maxPlayers;i++) {
-      const tile = node('div','player-tile empty');tile.append(node('span','avatar','+'));
-      const info=node('div');info.append(node('strong','',`مقعد ${formatNumber(i+1)}`));info.append(node('small','','فارغ'));
-      tile.append(info);$('lobbyPlayerList').append(tile);
-    }
     const isHost = room.hostId === socket.id;
     $('hostSettingsPanel').hidden = !isHost;
     $('hostSettingsPanel').inert = !isHost;
     $('hostSettingsPanel').setAttribute('aria-hidden',String(!isHost));
     $('saveSettingsBtn').disabled = !isHost;
     if (isHost) {
-      const fields = { hostMaxPlayers:'maxPlayers', hostHearts:'hearts', hostMinTime:'fuseMinSec',
+      const fields = { hostHearts:'hearts', hostMinTime:'fuseMinSec',
         hostMaxTime:'fuseMaxSec', hostMode:'mode' };
       for (const [id,key] of Object.entries(fields)) $(id).value = String(room.settings[key]);
     }
@@ -234,11 +241,16 @@
     $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}`;
     $('gameHeadline').textContent = mine ? 'السمكة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
-    $('holderChip').textContent = mine ? 'دورك الآن: جاوب ومرّر بسرعة' : `الدور عند ${holder?.name || 'لاعب آخر'}`;
+    const topics = {'geography':'🌍 جغرافيا','food':'🍉 أكل ومشروبات','nature':'🦋 طبيعة','sports':'⚽ رياضة',
+      'everyday':'🏡 يوميات','health-science':'🧬 علوم وصحة','technology':'💻 تقنية','entertainment':'🎬 ترفيه',
+      'science':'🔭 علوم','arab-culture':'🌙 الوطن العربي','world-culture':'🌎 العالم','general':'✨ أسئلة عامة',
+      'gaming-characters':'🎮 شخصيات ألعاب','gaming-worlds':'🗺️ عوالم ألعاب','gaming-items':'⚔️ أدوات ألعاب',
+      'gaming-culture':'🏆 ثقافة Gaming','gaming-titles':'🕹️ ألعاب'};
+    $('gameCategory').textContent = topics[room.theme] || '✨ تحدي جديد';
+    $('holderChip').textContent = mine ? '⚡ دورك الآن!' : `🎯 الدور عند ${holder?.name || 'لاعب آخر'}`;
     $('holderChip').classList.toggle('mine',mine);
     $('answerInput').disabled = !mine;
     $('answerBtn').disabled = !mine;
-    $('timerCaption').textContent = mine ? 'أسرع! ما حدا بيعرف متى تنفجر' : 'المؤقت مخفي… لا تتأخر لما يجي دورك';
     renderArena(room);
     $('gameCount').textContent = `${formatNumber(room.players.filter(p => p.hearts > 0).length)} ناجين`;
     $('gamePlayerList').replaceChildren();
@@ -252,6 +264,8 @@
       info.append(node('div','hearts',('♥ '.repeat(p.hearts)||'خرج من اللعبة').trim()));
       const stats=node('div','player-stats',`${formatNumber(p.score)} نقطة · ${formatNumber(p.correct)} إجابة`);
       info.append(stats);
+      const last=node('div','sidebar-last-word',p.lastAnswer ? `آخر جواب: ${p.lastAnswer}` : 'لم يجب بعد');
+      info.append(last);
       if (p.timeBonus) info.append(node('div','time-bank',`+${formatNumber(p.timeBonus)} ثواني لما تبدأ جولة`));
       const bar=node('div','chargebar');const fill=node('span');fill.style.width=`${Math.max(0,Math.min(100,p.charge))}%`;bar.append(fill);info.append(bar);
       el.append(info); $('gamePlayerList').append(el);
@@ -271,6 +285,17 @@
     if (!mine && state.wasMyTurn) { $('answerInput').value = ''; clearPreview(); }
     if (state.room?.round !== state.lastPreviewRound) { clearPreview(); state.lastPreviewRound = state.room?.round; }
     state.wasMyTurn = mine;
+    updateCountdown();
+  }
+  function updateCountdown() {
+    const room=state.room;
+    if(!room || room.status!=='playing' || !room.fuseEndsAt) return;
+    const remaining=Math.max(0,(room.fuseEndsAt-(Date.now()+state.clockSkew))/1000);
+    $('timerValue').textContent=remaining.toFixed(1);
+    const fraction=Math.max(0,Math.min(1,remaining*1000/Math.max(1,room.fuseDurationMs||1000)));
+    $('timerFill').style.width=`${fraction*100}%`;
+    $('timerDisplay').classList.toggle('urgent',remaining<=5);
+    $('timerDisplay').classList.toggle('critical',remaining<=2);
   }
   function updateEnded(room) {
     const winner = room.players.find(p => p.id === room.winnerId);
@@ -292,6 +317,7 @@
   }
   function onState(room) {
     state.room = room;
+    if(Number.isFinite(room.serverNow)) state.clockSkew=room.serverNow-Date.now();
     const screen = room.status === 'playing' ? 'game' : room.status === 'ended' ? 'ended' : 'lobby';
     switchScreen(screen);
     if (screen === 'lobby') updateLobby(room);
@@ -311,6 +337,19 @@
       toast(event.text);
     }
     if(event.type==='win') toast(event.text);
+  }
+  function showAnswerError(message) {
+    const duplicate=/مستخدم/.test(message);
+    const wording=duplicate ? `⚠️ ${message}` : /ما لقينا جواب/.test(message)
+      ? '✖ إجابة غير صحيحة! جرّب كلمة مختلفة أو تأكد من كتابتها.' : `✖ ${message}`;
+    feedback(wording,'error');beep('wrong');
+    const dock=document.querySelector('.answer-dock');
+    dock.classList.remove('invalid');
+    $('answerInput').classList.remove('input-shake');
+    void dock.offsetWidth; // restart animation for consecutive wrong submissions
+    dock.classList.add('invalid');
+    $('answerInput').classList.add('input-shake');
+    setTimeout(()=>{dock.classList.remove('invalid');$('answerInput').classList.remove('input-shake');},700);
   }
   function clearPreview() {
     clearTimeout(previewTimer); previewSeq++;
@@ -344,12 +383,12 @@
   function onAnswerSubmit(event) {
     event.preventDefault();
     const answer = $('answerInput').value.trim();
-    if (!answer) return feedback('اكتب إجابتك أولًا', 'error');
+    if (!answer) return showAnswerError('اكتب إجابتك أولًا');
     request('submitAnswer', {answer}, ({answer:value, points, heartsGained, gainedTime, rarityLabel, correction}) => {
       $('answerInput').value = '';
       clearPreview();
       feedback(`${correction === 'exact' ? 'ممتاز!' : 'خمّنا جوابك!'} ${value} — ${rarityLabel} (+${formatNumber(points)} نقطة)${heartsGained ? ` +${formatNumber(heartsGained)} قلب!` : ''}${gainedTime ? ` +${formatNumber(gainedTime)} ثواني للمستقبل!` : ''}`, 'success');
-    });
+    },showAnswerError);
   }
   socket.on('connect', () => {
     $('statusIndicator').classList.add('online');
@@ -400,4 +439,5 @@
     $('soundBtn').textContent=state.sound?'♫':'♩';
   });
   $('soundBtn').classList.toggle('off',!state.sound);
+  setInterval(updateCountdown,100);
 })();
