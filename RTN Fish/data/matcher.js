@@ -154,6 +154,8 @@
         answer: question.answers[i], kind: norm(question.answers[i].display) === attempted ? 'exact' : 'synonym'
       };
     }
+    // Keep different place names distinct even when edit distance is small.
+    if (attempted === 'oman' || attempted === 'amman') return null;
     const proposals = [];
     for (let i = 0; i < keysByAnswer.length; i++) {
       let best = -Infinity, bestKind = null;

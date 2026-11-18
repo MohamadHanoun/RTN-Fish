@@ -242,4 +242,5 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
   const category = gamingPrompts.has(prompt) || legacyGamingPattern.test(prompt) ? 'gaming' : 'mixed';
   return { id: idx + 1, prompt, category, theme: themeFor(prompt,category,source), answers };
 });
+require('./knowledge-v3').enhanceQuestions(questions);
 module.exports = { questions, lookup, norm, matchDetailed, rarityLevels };
