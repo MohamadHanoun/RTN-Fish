@@ -68,9 +68,12 @@
     // Keep seat nodes between broadcasts so avatars don't flicker on every answer.
     const existing = new Map(Array.from(arena.children,el=>[el.dataset.playerId,el]));
     const count = room.players.length;
+    // The viewer always sits at six o'clock on their own device. Other players
+    // keep their relative turn order, but the perspective is local to each user.
+    const myIndex = room.players.findIndex(p => p.id === socket.id);
+    const anchorIndex = myIndex >= 0 ? myIndex : 0;
     room.players.forEach((p,i) => {
-      // Players sit at equally spaced, stable places around the central fish.
-      const angle = -Math.PI/2 + (2*Math.PI*i/count);
+      const angle = Math.PI/2 + (2*Math.PI*(i-anchorIndex)/Math.max(count,1));
       // Keep bottom seats and their last-word bubbles above the answer dock.
       const vertical = Math.sin(angle);
       const x = 50 + 37*Math.cos(angle), y = 50 + (vertical > 0 ? 28 : 37)*vertical;
@@ -103,7 +106,9 @@
       arena.append(seat);
     });
     const turnIndex=room.players.findIndex(p=>p.id===room.currentPlayerId);
-    $('arena').style.setProperty('--turn-rotation',`${turnIndex<0 ? 0 : 360*turnIndex/count}deg`);
+    // Beam rotation follows the same local perspective: 180deg points down.
+    const relativeTurn = count ? (turnIndex-anchorIndex+count)%count : 0;
+    $('arena').style.setProperty('--turn-rotation',`${turnIndex<0 ? 0 : 180+360*relativeTurn/count}deg`);
     $('arena').classList.toggle('has-turn',turnIndex>=0);
     for (const stale of existing.values()) stale.remove();
   }
