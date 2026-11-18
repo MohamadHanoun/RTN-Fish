@@ -10,16 +10,16 @@
       id: null, connected: false,
       on(event, callback) { if (!listeners.has(event)) listeners.set(event,[]);listeners.get(event).push(callback);return socket; },
       emit(event, data, callback) { return transmit(event,data,callback); },
-      timeout(milliseconds) { return { emit(event,data,callback) { return transmit(event,data,(result)=>callback(null,result)); } }; },
+      timeout(milliseconds) { return { emit(event,data,callback) { return transmit(event,data,callback,milliseconds); } }; },
       disconnect() {closed=true;if(ws)ws.close();}
     };
     function event(name,data){(listeners.get(name)||[]).forEach(fn => fn(data));}
-    function transmit(name,data,callback) {
+    function transmit(name,data,callback,timeoutMs=7000) {
       if(!socket.connected){if(callback)callback({ok:false,error:'غير متصل'});return;}
       const seq=++nextSeq;
       if(callback){
         pending.set(seq,callback);
-        setTimeout(()=>{if(pending.has(seq)){pending.delete(seq);callback(null,{ok:false,error:'انتهت مهلة الاتصال'});}},7000);
+        setTimeout(()=>{if(pending.has(seq)){pending.delete(seq);callback(null,{ok:false,error:'انتهت مهلة الاتصال'});}},Math.max(1000,Number(timeoutMs)||7000));
       }
       ws.send(JSON.stringify({t:'event',event:name,data,seq}));
     }
