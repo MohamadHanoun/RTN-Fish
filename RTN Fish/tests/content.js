@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { questions, matchDetailed, norm } = require('../data/questions');
+const { requiredAnswers } = require('../data/progression');
 const checkTranslation=(prompt,typed,expected)=>{
   const q=questions.find(question=>question.prompt===prompt);
   assert(q,`missing question: ${prompt}`);
@@ -18,6 +19,9 @@ const countries = [
 ];
 
 assert.equal(new Set(questions.map(q => q.prompt)).size, questions.length, 'question prompts must be unique');
+for (const [total,expected] of [[0,0],[3,3],[5,4],[10,4],[20,8],[30,12],[100,40]]) {
+  assert.equal(requiredAnswers(total),expected,`answer goal for ${total} choices`);
+}
 assert(questions.length >= 380, 'expanded question collection should be loaded');
 for (const country of countries) {
   const q = questions.find(question => question.prompt === `اذكر معلمًا أو مكانًا مشهورًا في ${country}`);
@@ -50,5 +54,6 @@ for(const [prompt,english,arabic] of [
 assert(html.includes('id="inviteForm"') && html.includes('id="inviteName"'), 'invite needs a name-only entry form');
 assert(app.includes('enterInviteRoom(true)'), 'saved-name invite must autojoin');
 assert(app.includes("$('hostSettingsPanel').hidden = !isHost"), 'guest controls must stay hidden');
+assert(app.includes('room.usedCount ?? room.usedAnswers.length'), 'progress must support more than 30 used answers');
 
-console.log(`PASS: ${questions.length} question categories, ${countries.length} Arab countries, Arabic/English answers, invite UI, Latin digits`);
+console.log(`PASS: ${questions.length} categories, ${countries.length} Arab countries, dynamic answer goals, bilingual answers, invite UI`);

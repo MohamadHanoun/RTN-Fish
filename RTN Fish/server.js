@@ -2,13 +2,13 @@
 const crypto = require('crypto');
 const { createTransport } = require('./transport');
 const { questions, norm, matchDetailed } = require('./data/questions');
+const { requiredAnswers } = require('./data/progression');
 const { server, io } = createTransport();
 const PORT = Number(process.env.PORT) || 3000;
 const rooms = new Map();
 const socketRoom = new Map();
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MIN_TIME = 6, MAX_TIME = 90, MAX_HEARTS = 10;
-const ANSWERS_PER_QUESTION = 4;
 
 function safeName(value) {
   return String(value ?? '').replace(/[<>\r\n\u0000-\u001f]/g, '').trim().slice(0,18) || 'لاعب';
@@ -42,7 +42,7 @@ function serialize(room) {
       ({id,name,hearts,charge,correct,score,timeBonus,rarityCounts})),
     currentPlayerId: room.currentPlayerId,
     question: questions.find(q => q.id === room.questionId)?.prompt ?? null,
-    usedAnswers: room.usedDisplay.slice(-30),
+    usedAnswers: room.usedDisplay.slice(-30), usedCount: room.used.size,
     round: room.round, answerGoal: room.answerGoal, recent: room.recent, winnerId: room.winnerId,
     // The precise fuse duration and end time must stay hidden on the server.
     phaseStarted: room.phaseStarted
@@ -100,7 +100,7 @@ function beginQuestion(room,preferredId=null) {
   room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();
   const question=chooseQuestion(room);
   room.questionId=question.id;
-  room.answerGoal=Math.min(ANSWERS_PER_QUESTION,question.answers.length);
+  room.answerGoal=requiredAnswers(question.answers.length);
   const selected=activePlayers(room).find(p=>p.id===preferredId)
     ||activePlayers(room)[crypto.randomInt(activePlayers(room).length)];
   room.currentPlayerId=selected.id;
@@ -168,7 +168,7 @@ io.on('connection',socket=>{
     const code=roomCode();
     const room={code,settings,maxHearts:Math.min(MAX_HEARTS,settings.hearts+3),hostId:socket.id,
       status:'lobby',players:[makePlayer(socket,data?.name,settings.hearts)],used:new Set(),
-      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],round:0,answerGoal:ANSWERS_PER_QUESTION,currentPlayerId:null,
+      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],round:0,answerGoal:0,currentPlayerId:null,
       fuseEndsAt:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
     rooms.set(code,room);socketRoom.set(socket.id,code);socket.join(code);broadcast(room);
     ackSafe(ack,{ok:true,code});
@@ -247,7 +247,7 @@ io.on('connection',socket=>{
     }
     const next=nextActive(room,socket.id);
     if(room.used.size>=room.answerGoal) {
-      // Four distinct accepted answers unlock a fresh question, not a new match.
+      // A fraction of the question's available answers unlocks the next question.
       beginQuestion(room,next?.id);
     } else {
       const remaining=Math.max(1,room.fuseEndsAt-now); // shared fuse continues between answers

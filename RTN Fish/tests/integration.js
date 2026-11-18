@@ -3,6 +3,7 @@
 const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const {questions,matchDetailed}=require('../data/questions');
+const {requiredAnswers}=require('../data/progression');
 const PORT=34597;
 const server=spawn(process.execPath,['server.js'],{cwd:require('path').join(__dirname,'..'),env:{...process.env,PORT:String(PORT)},stdio:['ignore','pipe','pipe']});
 let stderr='';server.stderr.on('data',d=>stderr+=d);
@@ -76,7 +77,7 @@ async function main(){
   await sleep(60);
   assert.equal(second.room.currentPlayerId,first.id);
   assert.equal(first.room.usedAnswers.length,2,'accepted answers share one question');
-  assert.equal(first.room.answerGoal,4,'four accepted answers are needed');
+  assert.equal(first.room.answerGoal,requiredAnswers(q.answers.length),'required answers depend on category size');
   // An explosion must cost the holder one heart and PASS the same question.
   const initialQuestion=first.room.question;
   await sleep(6300);
@@ -92,22 +93,24 @@ async function main(){
   assert.equal(first.room.currentPlayerId,first.id,'pass continues around the table');
   assert.equal(first.room.players.find(p=>p.id===second.id).hearts,1);
   assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,0,'time bonus applies to a new question');
-  // Four distinct answers advance to a new question without ending the match.
+  // The required fraction of distinct answers advances to a new question.
   const questionTwo=questions.find(x=>x.prompt===first.room.question);
-  const four=questionTwo.answers.filter(x=>matchDetailed(questionTwo,x.display)?.answer===x).slice(0,4);
-  assert.equal(four.length,4);
-  for(let i=0;i<4;i++) {
+  const goal=requiredAnswers(questionTwo.answers.length);
+  assert.equal(first.room.answerGoal,goal);
+  const accepted=questionTwo.answers.filter(x=>matchDetailed(questionTwo,x.display)?.answer===x).slice(0,goal);
+  assert.equal(accepted.length,goal);
+  for(let i=0;i<goal;i++) {
     const holder=first.room.currentPlayerId===a.id?a:b;
     await sleep(260);
-    const response=await holder.send('submitAnswer',{answer:four[i].display});
+    const response=await holder.send('submitAnswer',{answer:accepted[i].display});
     assert.equal(response.ok,true,`answer ${i+1} accepted`);
     await sleep(60);
-    if(i<3) {
+    if(i<goal-1) {
       assert.equal(first.room.round,2);
-      assert.equal(first.room.usedAnswers.length,i+1);
+      assert.equal(first.room.usedCount,i+1);
     }
   }
-  assert.equal(first.room.round,3,'four accepted answers change the question');
+  assert.equal(first.room.round,3,'the required answer percentage changes the question');
   assert.equal(first.room.status,'playing','match continues after question changes');
   assert.notEqual(first.room.question,questionTwo.prompt);
   assert.equal(first.room.usedAnswers.length,0);
@@ -129,7 +132,7 @@ async function main(){
   assert.equal(a.room.status,'ended','the match ends only with one surviving player');
   assert.equal(a.room.winnerId,winnerId,'last player with hearts wins');
   assert.equal(a.room.players.find(p=>p.id===losingId).hearts,0,'player with no hearts is eliminated');
-  console.log('PASS: room settings authorization, continuous matches, four-answer question changes, all-failed skips, lost hearts and turn passing');
+  console.log('PASS: room settings authorization, continuous matches, proportional question goals, all-failed skips and turn passing');
   a.close();b.close();
 }
 main().then(()=>server.kill()).catch(e=>{server.kill();console.error('FAIL',e,stderr);process.exitCode=1});

@@ -211,7 +211,7 @@
       const bar=node('div','chargebar');const fill=node('span');fill.style.width=`${Math.max(0,Math.min(100,p.charge))}%`;bar.append(fill);info.append(bar);
       el.append(info); $('gamePlayerList').append(el);
     });
-    $('usedCount').textContent = `${formatNumber(room.usedAnswers.length)} / ${formatNumber(room.answerGoal || 4)}`;
+    $('usedCount').textContent = `${formatNumber(room.usedCount ?? room.usedAnswers.length)} / ${formatNumber(room.answerGoal ?? 0)}`;
     $('usedList').replaceChildren();
     if (!room.usedAnswers.length) $('usedList').append(node('span','muted','لسه ما في إجابات'));
     else room.usedAnswers.forEach(a => {
