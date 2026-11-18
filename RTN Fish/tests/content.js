@@ -20,9 +20,11 @@ const countries = [
 ];
 
 assert.equal(new Set(questions.map(q => q.prompt)).size, questions.length, 'question prompts must be unique');
-for (const [total,expected] of [[0,0],[3,3],[5,4],[10,4],[20,8],[30,12],[100,40]]) {
+for (const [total,expected] of [[0,0],[3,3],[5,4],[10,5],[20,9],[30,12],[100,12]]) {
   assert.equal(requiredAnswers(total),expected,`answer goal for ${total} choices`);
 }
+assert.equal(requiredAnswers(100,5),30,'more players should get a larger answer goal');
+assert.equal(requiredAnswers(20,5),9,'answer-rich topics cannot end after just four words');
 assert(questions.length >= 380, 'expanded question collection should be loaded');
 const answerTotal=questions.reduce((total,q)=>total+q.answers.length,0);
 const englishTotal=questions.reduce((total,q)=>total+q.answers.reduce((sum,a)=>sum+a.aliases.filter(word=>/[a-z]/i.test(word)).length,0),0);

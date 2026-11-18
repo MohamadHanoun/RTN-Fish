@@ -7,6 +7,13 @@
   const roomFromLink = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
   let pendingInviteCode = /^[A-Z]{4}$/.test(roomFromLink || '') ? roomFromLink : null;
   let inviteJoining = false, inviteAutoAttempted = false;
+  const sessionKey = code => `samaka-session:${code}`;
+  function savedSession(code) { try{return sessionStorage.getItem(sessionKey(code));}catch(_e){return null;} }
+  function rememberSession(response) {
+    if(!response?.code||!response.sessionToken)return;
+    try{sessionStorage.setItem(sessionKey(response.code),response.sessionToken);}catch(_e){}
+  }
+  function clearSession(code){try{sessionStorage.removeItem(sessionKey(code));}catch(_e){}}
   // Always show Western digits (0–9), even if the browser uses an Arabic locale.
   const numberFormatter = new Intl.NumberFormat('en-US-u-nu-latn');
   const formatNumber = n => numberFormatter.format(Number(n || 0));
@@ -80,13 +87,13 @@
         seat.append(node('span','arena-turn-label','عنده الدور'));
       }
       existing.delete(p.id);
-      seat.className = `arena-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.id===socket.id?'my-seat':''}`;
+      seat.className = `arena-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.connected===false?'disconnected':''} ${p.id===socket.id?'my-seat':''}`;
       seat.style.left = `${x}%`;
       seat.style.top = `${y}%`;
       seat.style.setProperty('--seat-delay',`${i*70}ms`);
       seat.title = `${p.name} · ${formatNumber(p.hearts)} قلوب · ${formatNumber(p.score)} نقطة`;
       seat.querySelector('.arena-player-name').textContent = p.name;
-      seat.querySelector('.arena-player-hearts').textContent = p.hearts>0 ? `♥ ${formatNumber(p.hearts)}` : 'خرج';
+      seat.querySelector('.arena-player-hearts').textContent = p.hearts<=0 ? 'خرج' : p.connected===false ? '⌁ يرجع قريبًا' : `♥ ${formatNumber(p.hearts)}`;
       const last = seat.querySelector('.arena-last-word');
       last.textContent = p.lastAnswer ? `💬 ${p.lastAnswer}` : '';
       last.dir = 'auto';
@@ -149,7 +156,9 @@
     const name = getName(); if (!name) return;
     const settings = getHomeSettings();
     if (!checkSettings(settings)) return;
-    request('createRoom', { name, ...settings }, ({code}) => {
+    request('createRoom', { name, ...settings }, response => {
+      rememberSession(response);
+      const {code}=response;
       history.replaceState(null, '', `/?room=${code}`);
       toast('تم إنشاء الغرفة! شارك رمز الدعوة مع أصحابك');
     });
@@ -158,7 +167,9 @@
     const name = getName(); if (!name) return;
     const code = $('roomCodeInput').value.trim().toUpperCase();
     if (!/^[A-Z]{4}$/.test(code)) return toast('رمز الغرفة لازم يكون أربع أحرف إنجليزية');
-    request('joinRoom', { code, name }, ({code}) => {
+    request('joinRoom', { code, name }, response => {
+      rememberSession(response);
+      const {code}=response;
       history.replaceState(null, '', `/?room=${code}`);
       toast('دخلت الغرفة!');
     });
@@ -182,6 +193,7 @@
         return;
       }
       pendingInviteCode = null;
+      rememberSession(response);
       history.replaceState(null,'',`/?room=${response.code}`);
     });
   }
@@ -190,7 +202,9 @@
     $('inviteError').textContent = message;
   }
   function leaveRoom() {
+    const code=state.room?.code;
     request('leaveRoom', {}, () => {
+      if(code)clearSession(code);
       state.room = null; state.wasMyTurn = false;
       history.replaceState(null, '', '/');
       switchScreen('home');
@@ -215,7 +229,7 @@
       tile.append(animalAvatar(p,'lobby-avatar'));
       const info = node('div');info.append(node('strong','',p.name));
       const animalName = window.SamakaAnimals?.animals[p.avatar]?.label || 'حيوان';
-      info.append(node('small','',`${p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`} · ${animalName}`));
+      info.append(node('small','',`${p.id === room.hostId ? 'صاحب الغرفة' : `لاعب ${formatNumber(i + 1)}`} · ${animalName}${p.connected===false?' · 🔌 غير متصل':''}`));
       tile.append(info);$('lobbyPlayerList').append(tile);
     });
     const isHost = room.hostId === socket.id;
@@ -232,7 +246,7 @@
       : room.settings.mode === 'mostlyGaming' ? 'Gaming أغلب الوقت' : 'كل الأسئلة';
     $('lobbySettingsSummary').textContent = `الإعدادات: ${formatNumber(room.settings.hearts)} قلوب · من ${formatNumber(room.settings.fuseMinSec)} إلى ${formatNumber(room.settings.fuseMaxSec)} ثانية · ${mode}`;
     $('startBtn').hidden = !isHost;
-    $('startBtn').disabled = !isHost || room.players.length < 2;
+    $('startBtn').disabled = !isHost || room.players.filter(p=>p.connected).length < 2;
     $('waitingText').textContent = isHost
       ? (room.players.length < 2 ? 'لازم يدخل لاعب ثاني على الأقل' : 'كل اللاعبين جاهزين؟ ابدأ اللعبة!')
       : 'بانتظار صاحب الغرفة ليبدأ اللعبة…';
@@ -241,7 +255,7 @@
     const mine = room.currentPlayerId === socket.id;
     const holder = room.players.find(p => p.id === room.currentPlayerId);
     $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}`;
-    $('gameHeadline').textContent = mine ? 'السمكة عندك!' : 'خليك جاهز!';
+    $('gameHeadline').textContent = !room.currentPlayerId ? 'بانتظار عودة اللاعبين…' : mine ? 'السمكة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
     const topics = {'geography':'🌍 جغرافيا','food':'🍉 أكل ومشروبات','nature':'🦋 طبيعة','sports':'⚽ رياضة',
       'everyday':'🏡 يوميات','health-science':'🧬 علوم وصحة','technology':'💻 تقنية','entertainment':'🎬 ترفيه',
@@ -249,7 +263,7 @@
       'gaming-characters':'🎮 شخصيات ألعاب','gaming-worlds':'🗺️ عوالم ألعاب','gaming-items':'⚔️ أدوات ألعاب',
       'gaming-culture':'🏆 ثقافة Gaming','gaming-titles':'🕹️ ألعاب'};
     $('gameCategory').textContent = topics[room.theme] || '✨ تحدي جديد';
-    $('holderChip').textContent = mine ? '⚡ دورك الآن!' : `🎯 الدور عند ${holder?.name || 'لاعب آخر'}`;
+    $('holderChip').textContent = !holder ? '⏸ الجولة متوقفة مؤقتًا' : mine ? '⚡ دورك الآن!' : `🎯 الدور عند ${holder.name}`;
     $('holderChip').classList.toggle('mine',mine);
     $('answerInput').disabled = !mine;
     $('answerBtn').disabled = !mine;
@@ -257,10 +271,10 @@
     $('gameCount').textContent = `${formatNumber(room.players.filter(p => p.hearts > 0).length)} ناجين`;
     $('gamePlayerList').replaceChildren();
     room.players.forEach(p => {
-      const el = node('div',`game-player ${p.id === room.currentPlayerId ? 'is-active' : ''} ${p.hearts <= 0 ? 'is-dead' : ''}`);
+      const el = node('div',`game-player ${p.id === room.currentPlayerId ? 'is-active' : ''} ${p.hearts <= 0 ? 'is-dead' : ''} ${p.connected===false ? 'is-offline' : ''}`);
       el.append(animalAvatar(p,'sidebar-avatar'));
       const info=node('div','player-meta');
-      const title=node('strong','',p.name);
+      const title=node('strong','',`${p.connected===false?'🔌 ':''}${p.name}`);
       if(p.id===socket.id) title.append(node('span','you-chip',' (أنت)'));
       info.append(title);
       info.append(node('div','hearts',('♥ '.repeat(p.hearts)||'خرج من اللعبة').trim()));
@@ -291,7 +305,8 @@
   }
   function updateCountdown() {
     const room=state.room;
-    if(!room || room.status!=='playing' || !room.fuseEndsAt) return;
+    if(!room || room.status!=='playing')return;
+    if(!room.fuseEndsAt){$('timerValue').textContent='--.-';$('timerFill').style.width='0%';return;}
     const remaining=Math.max(0,(room.fuseEndsAt-(Date.now()+state.clockSkew))/1000);
     $('timerValue').textContent=remaining.toFixed(1);
     const fraction=Math.max(0,Math.min(1,remaining*1000/Math.max(1,room.fuseDurationMs||1000)));
@@ -306,18 +321,32 @@
     $('winnerName').textContent = winner ? `${winner.name} فاز!` : 'انتهت اللعبة';
     $('winnerSubtitle').textContent = winner ? 'آخر لاعب حافظ على قلوبه… بطل الجولة!' : 'كل اللاعبين خرجوا من المنافسة';
     const scores = [...room.players].sort((a,b) => b.hearts - a.hearts || b.score - a.score);
+    const awards=$('finalAwards');awards.replaceChildren();
+    function award(title,p,value){
+      if(!p)return;
+      const tile=node('div','award-tile');tile.append(node('span','award-icon',title.icon));
+      tile.append(node('strong','',title.label));tile.append(node('span','',p.name));
+      tile.append(node('small','',value));awards.append(tile);
+    }
+    const bestScore=[...room.players].sort((a,b)=>b.score-a.score)[0];
+    const fastest=room.players.filter(p=>p.bestAnswerMs!=null).sort((a,b)=>a.bestAnswerMs-b.bestAnswerMs)[0];
+    const survivor=[...room.players].sort((a,b)=>a.explosions-b.explosions||b.hearts-a.hearts)[0];
+    award({icon:'🏆',label:'ملك النقاط'},bestScore,`${formatNumber(bestScore?.score)} نقطة`);
+    award({icon:'⚡',label:'أسرع إجابة'},fastest,`${((fastest?.bestAnswerMs||0)/1000).toFixed(1)} ثانية`);
+    award({icon:'🛡️',label:'أقل انفجارات'},survivor,`${formatNumber(survivor?.explosions)} انفجارات`);
     $('finalScores').replaceChildren();
     scores.forEach((p,i) => {
       const row=node('div','final-entry');
       row.append(node('span','',`${formatNumber(i+1)}.`));
       row.append(node('strong','',p.name));
-      row.append(node('span','',`${formatNumber(p.score)} نقطة · ${formatNumber(p.correct)} إجابة · ${formatNumber(p.hearts)} قلوب`));
+      row.append(node('span','',`${formatNumber(p.score)} نقطة · ${formatNumber(p.correct)} إجابة · ${formatNumber(p.hearts)} قلوب · ${formatNumber(p.explosions)} انفجارات`));
       $('finalScores').append(row);
     });
     $('rematchBtn').hidden = room.hostId !== socket.id;
     if (state.screen !== 'ended') beep('win');
   }
   function onState(room) {
+    if(state.room?.code!==room.code)state.lastFeedSeq=-1;
     state.room = room;
     if(Number.isFinite(room.serverNow)) state.clockSkew=room.serverNow-Date.now();
     const screen = room.status === 'playing' ? 'game' : room.status === 'ended' ? 'ended' : 'lobby';
@@ -373,9 +402,9 @@
         const el = $('answerSuggestion');
         el.classList.toggle('used', Boolean(suggestion?.used));
         if (!suggestion) { el.textContent = ''; return; }
-        if (suggestion.used) el.textContent = `مستخدم من قبل: ${suggestion.display} — جرّب جواب تاني`;
-        else if (suggestion.kind === 'typo') el.textContent = `تخميني: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
-        else if (suggestion.kind === 'partial') el.textContent = `كمّلنا الكلمة: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
+        if (suggestion.used) el.textContent = `الجواب مستخدم من قبل${suggestion.display?`: ${suggestion.display}`:''} — جرّب غيره`;
+        else if (suggestion.kind === 'typo') el.textContent = 'قريب من جواب مقبول! راجع الكتابة قبل الإرسال';
+        else if (suggestion.kind === 'partial') el.textContent = 'ممتاز، كمّل الكلمة — لسه ناقصة';
         else if (suggestion.kind === 'synonym') el.textContent = `مرادف مقبول: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
         else el.textContent = `جواب معروف: ${suggestion.display} · ${suggestion.rarityLabel} (+${formatNumber(suggestion.points)}) ✓`;
         el.classList.add('rarity-preview',suggestion.rarity);
@@ -392,11 +421,29 @@
       feedback(`${correction === 'exact' ? 'ممتاز!' : 'خمّنا جوابك!'} ${value} — ${rarityLabel} (+${formatNumber(points)} نقطة)${heartsGained ? ` +${formatNumber(heartsGained)} قلب!` : ''}${gainedTime ? ` +${formatNumber(gainedTime)} ثواني للمستقبل!` : ''}`, 'success');
     },showAnswerError);
   }
+  function onRestoredRoom(code){
+    history.replaceState(null,'',`/?room=${code}`);
+    pendingInviteCode=null;inviteJoining=false;
+    $('inviteJoinBtn').disabled=false;
+  }
   socket.on('connect', () => {
     $('statusIndicator').classList.add('online');
     $('statusIndicator').querySelector('span').textContent = 'متصل';
-    // Socket IDs change on reconnect. An existing room cannot be resumed in this version.
-    if (state.room) { toast('رجع الاتصال. أدخل رمز الغرفة من جديد');state.room=null;state.wasMyTurn=false;switchScreen('home'); }
+    const code=state.room?.code||pendingInviteCode;
+    const token=code&&savedSession(code);
+    if(token){
+      state.wasMyTurn=false;
+      socket.timeout(6000).emit('resumeRoom',{code,sessionToken:token},(err,res)=>{
+        if(!err&&res?.ok){rememberSession(res);onRestoredRoom(code);toast('رجعت لمكانك باللعبة! 🐡');return;}
+        clearSession(code);
+        if(state.room){state.room=null;state.wasMyTurn=false;switchScreen(pendingInviteCode?'invite':'home');}
+        if(pendingInviteCode){
+          showInviteError(res?.error||'انتهت الجلسة القديمة. ادخل باسمك من جديد');
+        } else toast(res?.error||'انتهت مهلة العودة للغرفة');
+      });
+      return;
+    }
+    if(state.room){state.room=null;state.wasMyTurn=false;switchScreen('home');}
     if(pendingInviteCode && state.name && !inviteAutoAttempted) {
       inviteAutoAttempted = true;
       enterInviteRoom(true);
@@ -408,6 +455,14 @@
   });
   socket.on('state',onState);
   socket.on('feed',onFeed);
+  socket.on('reaction',event=>{
+    if(!REACTION_SET.has(event?.emoji)||!state.room)return;
+    const seat=[...$('arenaPlayers').children].find(el=>el.dataset.playerId===event.playerId);
+    if(!seat)return;
+    const bubble=node('div','floating-reaction',event.emoji);seat.append(bubble);
+    setTimeout(()=>bubble.remove(),2800);
+  });
+  const REACTION_SET=new Set(['👏','😂','😱','💀','🔥','🐡']);
   $('username').value=state.name;
   $('inviteName').value=state.name;
   if(pendingInviteCode) {
@@ -433,6 +488,18 @@
   $('rematchBtn').addEventListener('click',()=>request('startGame',{}));
   $('answerForm').addEventListener('submit',onAnswerSubmit);
   $('answerInput').addEventListener('input',previewAnswer);
+  $('suggestBtn').addEventListener('click',()=>{
+    const answer=$('answerInput').value.trim();
+    if(answer.length<2)return toast('اكتب الكلمة الناقصة بالأول');
+    request('suggestAnswer',{answer},()=>{
+      $('suggestStatus').textContent='✓ وصل اقتراحك للمراجعة، شكراً!';
+      setTimeout(()=>{$('suggestStatus').textContent='';},5000);
+    });
+  });
+  $('reactionButtons').addEventListener('click',event=>{
+    const button=event.target.closest('button[data-emoji]');
+    if(button&&state.room?.status==='playing')request('react',{emoji:button.dataset.emoji},null,()=>{});
+  });
   document.querySelectorAll('.leave-btn').forEach(btn=>btn.addEventListener('click',leaveRoom));
   $('soundBtn').addEventListener('click',()=>{
     state.sound=!state.sound;

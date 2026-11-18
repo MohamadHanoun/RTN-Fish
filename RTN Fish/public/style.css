@@ -314,4 +314,26 @@ body.in-game main{max-width:none;padding:0;margin:0;width:100%}
 }
 @media(prefers-reduced-motion:reduce){.holder-chip.mine,.timer-display.critical,.arena-turn-star,.arena-seat.on-turn:before{animation:none!important}}
 .arena-last-word{direction:initial;unicode-bidi:plaintext}
+.arena-seat.disconnected:not(.eliminated){filter:saturate(.42);border-style:dashed;box-shadow:0 8px 25px #051220b9}
+.arena-seat.disconnected .arena-player-hearts{font-size:11px;color:#ffd899;background:#432f3bd9}
+.game-player.is-offline:not(.is-dead){border-style:dashed;opacity:.65}
+.floating-reaction{position:absolute;top:-37px;left:50%;transform:translateX(-50%);font-size:37px;pointer-events:none;filter:drop-shadow(0 4px 10px #0009);z-index:30;animation:reactionFloat 2.8s ease-out forwards}
+@keyframes reactionFloat{0%{opacity:0;transform:translate(-50%,12px) scale(.45)}12%{opacity:1;transform:translate(-50%,0) scale(1.25)}50%{opacity:1}100%{opacity:0;transform:translate(-50%,-78px) scale(.95)}}
+.reactions-card{padding:14px 17px}
+.reaction-buttons{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.reaction-buttons button{min-width:0;height:45px;border-radius:11px;border:1px solid #6ecdbb57;background:#153847bc;font-size:24px;cursor:pointer;transition:background .18s,transform .18s}
+.reaction-buttons button:hover,.reaction-buttons button:focus-visible{background:#2d6a73;transform:translateY(-4px);outline:2px solid #93f7da}
+.reaction-buttons button:active{transform:scale(.9)}
+.answer-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:24px;margin-top:2px;padding-inline:6px}
+.answer-tools button{border:0;background:none;color:#8deed0;text-decoration:underline;text-underline-offset:4px;font:inherit;font-size:12px;cursor:pointer}
+.answer-tools button:hover{color:#fff}
+.answer-tools span{font-size:11px;color:#a1eacb}
+.final-awards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0}
+.award-tile{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:13px 6px;border-radius:15px;border:1px solid #73d7b966;background:linear-gradient(145deg,#174553c9,#0b2639e3);gap:5px;text-align:center;box-shadow:inset 0 1px #fff1}
+.award-tile .award-icon{font-size:30px}
+.award-tile strong{font-size:14px;color:#e5fff6}
+.award-tile>span:not(.award-icon){font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.award-tile small{font-size:11px;color:#92b9c5}
+@media(max-width:520px){.reaction-buttons button{font-size:22px;height:43px}.final-awards{gap:5px}.award-tile{padding:11px 4px}.award-tile strong{font-size:12px}.award-tile>span:not(.award-icon){font-size:11px}}
+@media(prefers-reduced-motion:reduce){.floating-reaction{animation:none}}
 [hidden]{display:none!important}

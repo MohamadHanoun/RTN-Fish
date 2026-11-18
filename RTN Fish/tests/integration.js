@@ -5,7 +5,7 @@ const {spawn}=require('node:child_process');
 const {questions,matchDetailed}=require('../data/questions');
 const {requiredAnswers}=require('../data/progression');
 const PORT=34597;
-const server=spawn(process.execPath,['server.js'],{cwd:require('path').join(__dirname,'..'),env:{...process.env,PORT:String(PORT)},stdio:['ignore','pipe','pipe']});
+const server=spawn(process.execPath,['server.js'],{cwd:require('path').join(__dirname,'..'),env:{...process.env,PORT:String(PORT),RECONNECT_GRACE_MS:'1200'},stdio:['ignore','pipe','pipe']});
 let stderr='';server.stderr.on('data',d=>stderr+=d);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 class Client {
@@ -102,7 +102,7 @@ async function main(){
   assert.equal(first.room.fuseDurationMs,firstAllowance,'the original player must regain their own full allowance on return');
   assert(first.room.fuseEndsAt-Date.now()>5600,'returning to a player renews their entire turn');
   assert.equal(first.room.usedAnswers.length,2,'accepted answers share one question');
-  assert.equal(first.room.answerGoal,requiredAnswers(q.answers.length),'required answers depend on category size');
+  assert.equal(first.room.answerGoal,requiredAnswers(q.answers.length,2),'required answers depend on category size');
   // An explosion must cost the holder one heart and PASS the same question.
   const initialQuestion=first.room.question;
   await sleep(Math.max(0,first.room.fuseEndsAt-Date.now())+300);
@@ -159,6 +159,58 @@ async function main(){
   assert.equal(a.room.status,'ended','the match ends only with one surviving player');
   assert.equal(a.room.winnerId,winnerId,'last player with hearts wins');
   assert.equal(a.room.players.find(p=>p.id===losingId).hearts,0,'player with no hearts is eliminated');
+  assert.equal(a.room.players.find(p=>p.id===losingId).explosions,1,'final losing explosion counts in match awards');
+  // A refresh/disconnect must NOT steal a seat, hearts, host rights or a turn.
+  const c=new Client(),d=new Client(),rejoined=new Client();
+  await c.connect();await d.connect();
+  r=await c.send('createRoom',{name:'منى',hearts:3,fuseMinSec:6,fuseMaxSec:8,mode:'all'});
+  const reconnectCode=r.code,secret=r.sessionToken,originalId=c.id;
+  assert(secret?.length>=24,'room creation gives a strong private resume token');
+  assert(!JSON.stringify(c.room).includes(secret),'resume secrets must never appear in broadcast states');
+  const dJoin=await d.send('joinRoom',{name:'سمير',code:reconnectCode});
+  assert(dJoin.sessionToken?.length>=24,'guest can resume too');
+  assert.notEqual(dJoin.sessionToken,secret,'every player has their own secret');
+  c.close();await sleep(170);
+  assert.equal(d.room.players.find(p=>p.id===originalId).connected,false,'a disconnected seat is preserved during grace');
+  assert.equal(d.room.hostId,originalId,'temporary disconnection does not immediately lose host');
+  await rejoined.connect();
+  let restored=await rejoined.send('resumeRoom',{code:reconnectCode,sessionToken:secret});
+  assert.equal(restored.ok,true,'refresh can recover the exact player seat');
+  await sleep(80);
+  assert.equal(d.room.hostId,rejoined.id,'host ownership transfers to the new socket ID');
+  assert.equal(d.room.players.length,2,'resuming never creates a duplicate player');
+  assert.equal(d.room.players.find(p=>p.id===rejoined.id).hearts,3,'reconnect preserves hearts');
+  assert.equal((await d.send('resumeRoom',{code:reconnectCode,sessionToken:secret})).ok,false,'an active seat cannot be hijacked');
+  r=await rejoined.send('startGame',{});assert.equal(r.ok,true,'restored host can start the game');
+  await sleep(80);
+  assert.equal((await d.send('react',{emoji:'👏'})).ok,true,'valid emoji reaction succeeds');
+  assert.equal((await d.send('react',{emoji:'🚫'})).ok,false,'arbitrary reactions are rejected');
+  assert.equal((await d.send('suggestAnswer',{answer:'mystery made-up phrase xyzxyz'})).ok,true,'missing answer can be reported');
+  const currentId=rejoined.room.currentPlayerId;
+  const offline=currentId===rejoined.id?rejoined:d;
+  const online=offline===rejoined?d:rejoined;
+  offline.close();await sleep(190);
+  assert.equal(online.room.currentPlayerId,online.id,'disconnecting holder passes the fish immediately');
+  assert(online.room.fuseEndsAt-Date.now()>5000,'next holder gets a completely fresh timer');
+  assert.equal(online.room.players.find(p=>p.id===currentId).hearts,3,'disconnected holder never loses a heart just for disconnecting');
+  const backInGame=new Client();await backInGame.connect();
+  const playingSecret=offline===rejoined?secret:dJoin.sessionToken;
+  restored=await backInGame.send('resumeRoom',{code:reconnectCode,sessionToken:playingSecret});
+  assert.equal(restored.ok,true,'a running match can be resumed after a disconnect');
+  await sleep(70);
+  assert.equal(online.room.players.find(p=>p.id===backInGame.id).hearts,3,'game recovery keeps all lives');
+  assert.equal(online.room.players.filter(p=>p.connected).length,2,'both players are back online');
+  backInGame.close();rejoined.close();d.close();
+  // If a host never returns, the game must recover instead of trapping guests.
+  const f=new Client(),g=new Client();await f.connect();await g.connect();
+  r=await f.send('createRoom',{name:'الهوست',hearts:3,fuseMinSec:6,fuseMaxSec:6});
+  const lostHostCode=r.code;
+  await g.send('joinRoom',{name:'الضيف',code:lostHostCode});
+  f.close();await sleep(1600);
+  assert.equal(g.room.players.length,1,'unrecovered lobby players are removed after grace');
+  assert.equal(g.room.hostId,g.id,'host rights transfer to a remaining connected player');
+  assert.equal(g.room.players[0].name,'الضيف');
+  g.close();
   console.log('PASS: room settings authorization, continuous matches, proportional question goals, all-failed skips and turn passing');
   a.close();b.close();
 }

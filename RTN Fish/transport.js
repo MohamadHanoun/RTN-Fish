@@ -22,6 +22,7 @@ function createTransport() {
   const hooks = new EventEmitter();
   const io = {
     on: (event,fn) => hooks.on(event,fn),
+    getSocket: id => clients.get(id),
     to: code => ({ emit: (event,data) => {
       for (const socket of clients.values()) if (socket.rooms.has(code)) socket.emit(event,data);
     } })

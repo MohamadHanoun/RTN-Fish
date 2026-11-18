@@ -9,6 +9,8 @@ const rooms = new Map();
 const socketRoom = new Map();
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MIN_TIME = 6, MAX_TIME = 90, MAX_HEARTS = 10;
+const RECONNECT_GRACE_MS = Math.max(500,Math.min(120_000,Number(process.env.RECONNECT_GRACE_MS)||45_000));
+const REACTIONS = new Set(['👏','😂','😱','💀','🔥','🐡']);
 const AVATARS = Object.freeze(['dog','wolf','fox','cat','bear','rabbit','lion','panda','tiger','owl','koala','raccoon']);
 
 function chooseAvatar(players = []) {
@@ -47,8 +49,8 @@ function serialize(room) {
     code: room.code, status: room.status, hostId: room.hostId,
     settings: {...room.settings}, maxPlayers: room.settings.maxPlayers,
     hearts: room.settings.hearts, maxHearts: room.maxHearts,
-    players: room.players.map(({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer}) =>
-      ({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer})),
+    players: room.players.map(({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer,connected,explosions,bestAnswerMs}) =>
+      ({id,name,avatar,hearts,charge,correct,score,timeBonus,rarityCounts,lastAnswer,connected,explosions,bestAnswerMs})),
     currentPlayerId: room.currentPlayerId,
     question: question?.prompt ?? null, theme:question?.theme ?? null,
     usedAnswers: room.usedDisplay.slice(-30), usedCount: room.used.size,
@@ -58,7 +60,11 @@ function serialize(room) {
   };
 }
 function broadcast(room) { io.to(room.code).emit('state',serialize(room)); }
-function clearFuse(room) { clearTimeout(room.timer);room.timer = null; }
+function clearFuse(room) {
+  clearTimeout(room.timer);room.timer = null;
+  // Invalidates even callbacks already queued when a turn switches hands.
+  room.fuseSerial=(room.fuseSerial||0)+1;
+}
 function emitFeed(room,type,text,detail={}) {
   room.recent = { type, text, ...detail, at: Date.now(), seq:(room.recent?.seq ?? 0) + 1 };
   io.to(room.code).emit('feed',room.recent);
@@ -72,13 +78,14 @@ function endGame(room) {
 }
 function setFuse(room,ms) {
   clearFuse(room);room.fuseDurationMs=ms;room.fuseEndsAt=Date.now()+ms;
-  room.timer=setTimeout(()=>explode(room.code),ms);
+  const serial=room.fuseSerial;
+  room.timer=setTimeout(()=>{if(room.fuseSerial===serial)explode(room.code);},ms);
 }
 function nextActive(room,previousId) {
   const index=room.players.findIndex(p=>p.id===previousId);
   for(let step=1;step<=room.players.length;step++) {
     const p=room.players[(index+step+room.players.length)%room.players.length];
-    if(p?.hearts>0) return p;
+    if(p?.hearts>0 && p.connected) return p;
   }
   return null;
 }
@@ -136,11 +143,13 @@ function beginQuestion(room,preferredId=null) {
   room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();room.turnDurationByPlayer=new Map();
   const question=chooseQuestion(room);
   room.questionId=question.id;
-  room.answerGoal=requiredAnswers(question.answers.length);
-  const selected=activePlayers(room).find(p=>p.id===preferredId)
-    ||activePlayers(room)[crypto.randomInt(activePlayers(room).length)];
-  room.currentPlayerId=selected.id;
-  const extra=startFuseFor(room,selected,true);
+  room.answerGoal=requiredAnswers(question.answers.length,activePlayers(room).length);
+  const online=activePlayers(room).filter(p=>p.connected);
+  const selected=online.find(p=>p.id===preferredId)
+    ||(online.length ? online[crypto.randomInt(online.length)] : null);
+  room.currentPlayerId=selected?.id ?? null;
+  const extra=selected ? startFuseFor(room,selected,true) : 0;
+  if(!selected){clearFuse(room);room.fuseEndsAt=null;}
   broadcast(room);
   io.to(room.code).emit('round',{round:room.round,bonusPlayerId:extra?selected.id:null,bonusSeconds:extra});
   if(extra) emitFeed(room,'time',`${selected.name} بدأ السؤال الجديد ومعه +${extra} ثوانٍ مكافأة!`,{bonusSeconds:extra});
@@ -151,6 +160,7 @@ function explode(code) {
   const holder=room.players.find(p=>p.id===room.currentPlayerId);
   if(!holder) return endGame(room);
   holder.hearts=Math.max(0,holder.hearts-1);
+  holder.explosions++;
   room.failedSinceAnswer.add(holder.id);
   clearFuse(room);
   emitFeed(room,'pop',`انفجرت السمكة عند ${holder.name} وخسر قلب!`);
@@ -161,11 +171,37 @@ function explode(code) {
   if(activePlayers(room).every(p=>room.failedSinceAnswer.has(p.id))) {
     // Everybody still alive has lost a heart without a successful answer:
     // don't trap the group on an impossible question.
-    beginQuestion(room,next.id);
+    beginQuestion(room,next?.id);
     return;
   }
-  room.currentPlayerId=next.id;
-  startFuseFor(room,next);
+  room.currentPlayerId=next?.id ?? null;
+  if(next)startFuseFor(room,next);
+  else room.fuseEndsAt=null;
+  broadcast(room);
+}
+function playerDeparture(room,player,expired=false) {
+  clearTimeout(player.disconnectTimer);player.disconnectTimer=null;
+  const wasHolder=room.currentPlayerId===player.id;
+  const upcoming=wasHolder?nextActive(room,player.id):null;
+  const wasHost=room.hostId===player.id;
+  room.failedSinceAnswer.delete(player.id);
+  room.turnDurationByPlayer?.delete(player.id);
+  if(expired && ['playing','ended'].includes(room.status)) {
+    if(room.status==='playing')player.hearts=0;
+    player.connected=false;
+  } else room.players=room.players.filter(p=>p!==player);
+  room.lastActiveAt=Date.now();
+  if(!room.players.length){clearFuse(room);rooms.delete(room.code);return;}
+  if(wasHost)room.hostId=(room.players.find(p=>p.connected)||room.players[0]).id;
+  if(room.status==='playing'){
+    if(activePlayers(room).length<=1) return endGame(room);
+    if(wasHolder){
+      const next=upcoming?.hearts>0&&upcoming.connected?upcoming:nextActive(room,player.id);
+      room.currentPlayerId=next?.id??null;
+      if(next)startFuseFor(room,next);
+      else {clearFuse(room);room.fuseEndsAt=null;}
+    }
+  }
   broadcast(room);
 }
 function leave(socket,notify=true) {
@@ -173,30 +209,40 @@ function leave(socket,notify=true) {
   socketRoom.delete(socket.id);socket.leave(code);
   const room=rooms.get(code);if(!room)return;
   const leaving=room.players.find(p=>p.id===socket.id);
-  const wasHolder=room.currentPlayerId===socket.id;
-  room.players=room.players.filter(p=>p.id!==socket.id);
-  room.lastActiveAt=Date.now();
-  if(!room.players.length){clearFuse(room);rooms.delete(code);return;}
-  if(room.hostId===socket.id)room.hostId=room.players[0].id;
-  if(room.status==='playing'){
-    if(activePlayers(room).length<=1)endGame(room);
-    else if(wasHolder){
-      const next=activePlayers(room)[0];room.currentPlayerId=next.id;
-      // Don't reset the timer on disconnect, preventing free time exploits.
-      room.phaseStarted=Date.now();
-    }
+  if(!leaving)return;
+  playerDeparture(room,leaving);
+  if(notify && leaving && room.status!=='ended')emitFeed(room,'leave',`${leaving.name} غادر الغرفة`);
+}
+function disconnect(socket) {
+  const code=socketRoom.get(socket.id);if(!code)return;
+  socketRoom.delete(socket.id);
+  const room=rooms.get(code),player=room?.players.find(p=>p.id===socket.id);
+  if(!player)return;
+  player.connected=false;
+  player.disconnectTimer=setTimeout(()=>{
+    if(rooms.get(code)!==room || player.connected)return;
+    playerDeparture(room,player,true);
+    if(room.status!=='ended')emitFeed(room,'leave',`${player.name} انتهت مهلة إعادة اتصاله`);
+  },RECONNECT_GRACE_MS);
+  player.disconnectTimer.unref?.();
+  if(room.status==='playing' && room.currentPlayerId===player.id){
+    const next=nextActive(room,player.id);
+    room.currentPlayerId=next?.id??null;
+    if(next)startFuseFor(room,next);
+    else {clearFuse(room);room.fuseEndsAt=null;}
   }
-  if(notify && leaving)emitFeed(room,'leave',`${leaving.name} غادر الغرفة`);
   broadcast(room);
+  emitFeed(room,'connection',`${player.name} انقطع اتصاله — عنده 45 ثانية ليرجع`);
 }
 function ackSafe(cb,response){if(typeof cb==='function')cb(response);}
-function makePlayer(socket,name,hearts,avatar){
-  return {id:socket.id,name:safeName(name),avatar:avatar || chooseAvatar(),hearts,charge:0,correct:0,score:0,timeBonus:0,lastAnswer:'',
+function makePlayer(socket,name,hearts,avatar,token){
+  return {id:socket.id,sessionToken:token||crypto.randomBytes(24).toString('base64url'),connected:true,
+    name:safeName(name),avatar:avatar || chooseAvatar(),hearts,charge:0,correct:0,score:0,timeBonus:0,lastAnswer:'',explosions:0,bestAnswerMs:null,
     rarityCounts:{common:0,uncommon:0,rare:0,epic:0,legendary:0}};
 }
 
 io.on('connection',socket=>{
-  let lastAnswerAt=0,lastPreviewAt=0;
+  let lastAnswerAt=0,lastPreviewAt=0,lastReactionAt=0,lastSuggestionAt=0;
   socket.on('createRoom',(data,ack)=>{
     const settings=parseSettings(data);
     if(!settings)return ackSafe(ack,{ok:false,error:'إعدادات الغرفة غير صحيحة'});
@@ -207,7 +253,7 @@ io.on('connection',socket=>{
       usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],themeHistory:[],themeCounts:{},round:0,answerGoal:0,currentPlayerId:null,
       fuseEndsAt:null,fuseDurationMs:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
     rooms.set(code,room);socketRoom.set(socket.id,code);socket.join(code);broadcast(room);
-    ackSafe(ack,{ok:true,code});
+    ackSafe(ack,{ok:true,code,sessionToken:room.players[0].sessionToken});
   });
   socket.on('joinRoom',(data,ack)=>{
     const code=String(data?.code||'').trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
@@ -218,9 +264,35 @@ io.on('connection',socket=>{
     const name=safeName(data?.name);
     if(room.players.some(p=>norm(p.name)===norm(name)))return ackSafe(ack,{ok:false,error:'الاسم مستخدم بالغرفة'});
     leave(socket);
-    room.players.push(makePlayer(socket,name,room.settings.hearts,chooseAvatar(room.players)));
+    const player=makePlayer(socket,name,room.settings.hearts,chooseAvatar(room.players));
+    room.players.push(player);
     socketRoom.set(socket.id,code);socket.join(code);
-    room.lastActiveAt=Date.now();broadcast(room);ackSafe(ack,{ok:true,code});
+    room.lastActiveAt=Date.now();broadcast(room);ackSafe(ack,{ok:true,code,sessionToken:player.sessionToken});
+  });
+  socket.on('resumeRoom',(data,ack)=>{
+    const code=String(data?.code||'').trim().toUpperCase();
+    const token=typeof data?.sessionToken==='string'?data.sessionToken:'';
+    const room=rooms.get(code);
+    const player=room?.players.find(p=>p.sessionToken===token && token.length>=24);
+    if(!player)return ackSafe(ack,{ok:false,error:'الجلسة انتهت، ادخل للغرفة من جديد'});
+    if(player.connected)return ackSafe(ack,{ok:false,error:'حساب اللاعب متصل من جهاز آخر'});
+    leave(socket);
+    const oldId=player.id;
+    clearTimeout(player.disconnectTimer);player.disconnectTimer=null;
+    player.id=socket.id;player.connected=true;
+    if(room.hostId===oldId)room.hostId=socket.id;
+    if(room.currentPlayerId===oldId)room.currentPlayerId=socket.id;
+    if(room.winnerId===oldId)room.winnerId=socket.id;
+    if(room.failedSinceAnswer.has(oldId)){room.failedSinceAnswer.delete(oldId);room.failedSinceAnswer.add(socket.id);}
+    if(room.turnDurationByPlayer?.has(oldId)){
+      const duration=room.turnDurationByPlayer.get(oldId);
+      room.turnDurationByPlayer.delete(oldId);room.turnDurationByPlayer.set(socket.id,duration);
+    }
+    socketRoom.set(socket.id,code);socket.join(code);
+    room.lastActiveAt=Date.now();
+    if(room.status==='playing'&&!room.currentPlayerId){room.currentPlayerId=socket.id;startFuseFor(room,player);}
+    broadcast(room);
+    ackSafe(ack,{ok:true,code,sessionToken:token});
   });
   socket.on('updateSettings',(data,ack)=>{
     const room=rooms.get(socketRoom.get(socket.id));
@@ -236,10 +308,12 @@ io.on('connection',socket=>{
     const room=rooms.get(socketRoom.get(socket.id));
     if(!room)return ackSafe(ack,{ok:false,error:'أنت لست في غرفة'});
     if(room.hostId!==socket.id)return ackSafe(ack,{ok:false,error:'فقط الهوست يبدأ اللعبة'});
-    if(room.players.length<2)return ackSafe(ack,{ok:false,error:'تحتاج لاعبين على الأقل'});
+    if(room.players.filter(p=>p.connected).length<2)return ackSafe(ack,{ok:false,error:'تحتاج لاعبين متصلين على الأقل'});
     if(room.status==='playing')return ackSafe(ack,{ok:false,error:'اللعبة جارية'});
     clearFuse(room);room.status='playing';room.round=0;room.questionHistory=[];room.themeHistory=[];room.themeCounts={};room.winnerId=null;
-    room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts,p.avatar)));
+    for(const p of room.players)if(!p.connected)clearTimeout(p.disconnectTimer);
+    room.players=room.players.filter(p=>p.connected);
+    room.players.forEach(p=>Object.assign(p,makePlayer({id:p.id},p.name,room.settings.hearts,p.avatar,p.sessionToken)));
     beginQuestion(room);ackSafe(ack,{ok:true});
   });
   socket.on('previewAnswer',(data,ack)=>{
@@ -251,8 +325,10 @@ io.on('connection',socket=>{
       return ackSafe(ack,{ok:true,suggestion:null});
     const question=questions[room.questionId-1];
     const matched=matchDetailed(question,String(data?.answer??'').slice(0,70));
+    // Typo/partial previews cannot leak the undiscovered answer to a player.
     ackSafe(ack,{ok:true,suggestion:matched?{
-      display:matched.answer.display,kind:matched.kind,rarity:matched.answer.rarity,
+      display:['exact','synonym'].includes(matched.kind)?matched.answer.display:null,
+      kind:matched.kind,rarity:matched.answer.rarity,
       rarityLabel:matched.answer.rarityLabel,points:matched.answer.value,
       used:room.used.has(norm(matched.answer.display))}:null});
   });
@@ -274,6 +350,8 @@ io.on('connection',socket=>{
     const player=room.players.find(p=>p.id===socket.id);
     player.lastAnswer=submitted;
     player.correct++;player.score+=answer.value;player.charge+=answer.value;
+    const answerMs=Math.max(0,now-room.phaseStarted);
+    player.bestAnswerMs=player.bestAnswerMs===null?answerMs:Math.min(player.bestAnswerMs,answerMs);
     player.rarityCounts[answer.rarity]++;
     const beforeBonus=player.timeBonus;
     if(answer.timeBonus)player.timeBonus=Math.min(15,player.timeBonus+answer.timeBonus);
@@ -300,8 +378,29 @@ io.on('connection',socket=>{
     ackSafe(ack,{ok:true,answer:answer.display,rarity:answer.rarity,rarityLabel:answer.rarityLabel,
       points:answer.value,heartsGained,gainedTime,correction:match.kind});
   });
+  socket.on('react',(data,ack)=>{
+    const room=rooms.get(socketRoom.get(socket.id));
+    const emoji=String(data?.emoji||'');
+    if(!room||room.status!=='playing'||!REACTIONS.has(emoji))return ackSafe(ack,{ok:false,error:'تفاعل غير مسموح'});
+    if(Date.now()-lastReactionAt<1300)return ackSafe(ack,{ok:false,error:'لحظة قبل التفاعل التالي'});
+    lastReactionAt=Date.now();
+    io.to(room.code).emit('reaction',{playerId:socket.id,emoji,at:Date.now()});
+    ackSafe(ack,{ok:true});
+  });
+  socket.on('suggestAnswer',(data,ack)=>{
+    const room=rooms.get(socketRoom.get(socket.id));
+    if(!room||room.status!=='playing')return ackSafe(ack,{ok:false,error:'يجب أن تكون داخل مباراة'});
+    if(Date.now()-lastSuggestionAt<10_000)return ackSafe(ack,{ok:false,error:'انتظر 10 ثواني قبل اقتراح جديد'});
+    const answer=String(data?.answer||'').replace(/[<>\r\n\u0000-\u001f]/g,'').trim().slice(0,70);
+    if(answer.length<2)return ackSafe(ack,{ok:false,error:'اكتب إجابة من حرفين على الأقل'});
+    const q=questions[room.questionId-1];
+    if(matchDetailed(q,answer))return ackSafe(ack,{ok:false,error:'هذه الكلمة مقبولة بالفعل!'});
+    lastSuggestionAt=Date.now();
+    console.log('ANSWER_SUGGESTION',JSON.stringify({questionId:q.id,question:q.prompt,answer}));
+    ackSafe(ack,{ok:true});
+  });
   socket.on('leaveRoom',(_data,ack)=>{leave(socket);ackSafe(ack,{ok:true});});
-  socket.on('disconnect',()=>leave(socket));
+  socket.on('disconnect',()=>disconnect(socket));
 });
 
 setInterval(()=>{
