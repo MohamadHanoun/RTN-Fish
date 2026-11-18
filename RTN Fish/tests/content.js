@@ -74,6 +74,7 @@ assert(!html.includes('id="maxPlayers"') && !html.includes('id="hostMaxPlayers"'
 assert(html.includes('id="timerValue"') && app.includes('updateCountdown()'),'all players should see the countdown');
 assert(html.includes('id="arenaPlayers"') && app.includes('arena-last-word'),'players need their latest words beside their seats');
 assert(css.includes('/underwater.svg'),'underwater artwork must be loaded');
+assert(css.includes('[hidden]{display:none!important}'),'hidden host-only and turn controls must stay invisible');
 for(const [prompt,english,arabic] of [
   ['اذكر فاكهة','dragon fruit','فاكهة التنين'],
   ['اذكر مهنة','paramedic','مسعف'],

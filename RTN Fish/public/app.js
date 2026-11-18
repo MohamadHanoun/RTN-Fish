@@ -230,7 +230,7 @@
       : room.settings.mode === 'mostlyGaming' ? 'Gaming أغلب الوقت' : 'كل الأسئلة';
     $('lobbySettingsSummary').textContent = `الإعدادات: ${formatNumber(room.settings.hearts)} قلوب · من ${formatNumber(room.settings.fuseMinSec)} إلى ${formatNumber(room.settings.fuseMaxSec)} ثانية · ${mode}`;
     $('startBtn').hidden = !isHost;
-    $('startBtn').disabled = room.players.length < 2;
+    $('startBtn').disabled = !isHost || room.players.length < 2;
     $('waitingText').textContent = isHost
       ? (room.players.length < 2 ? 'لازم يدخل لاعب ثاني على الأقل' : 'كل اللاعبين جاهزين؟ ابدأ اللعبة!')
       : 'بانتظار صاحب الغرفة ليبدأ اللعبة…';
