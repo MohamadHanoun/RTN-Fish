@@ -29,7 +29,11 @@ function createTransport() {
   };
   const server = http.createServer((req,res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405);return res.end('Method Not Allowed'); }
-    if (req.url.split('?')[0] === '/health') { res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,clients:clients.size})); }
+    if (req.url.split('?')[0] === '/health') {
+      const {v4Summary} = require('./data/questions');
+      res.setHeader('Content-Type','application/json');
+      return res.end(JSON.stringify({ok:true,clients:clients.size,knowledgeV4:v4Summary}));
+    }
     let requested;
     try { requested = decodeURIComponent(req.url.split('?')[0]); } catch (_e) { res.writeHead(400);return res.end('Bad Request'); }
     if (requested === '/') requested = '/index.html';

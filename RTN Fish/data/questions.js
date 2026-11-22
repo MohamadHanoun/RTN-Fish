@@ -1,5 +1,5 @@
 'use strict';
-const { norm, extendAliases, lookup, matchDetailed } = require('./matcher');
+const { norm, extendAliases, matchDetailed: matchOriginal } = require('./matcher');
 const { englishAliases, registerSharedAliases } = require('./english');
 const gamingRaw = require('./gaming');
 const worldRaw = require('./world');
@@ -243,4 +243,11 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
   return { id: idx + 1, prompt, category, theme: themeFor(prompt,category,source), answers };
 });
 require('./knowledge-v3').enhanceQuestions(questions);
-module.exports = { questions, lookup, norm, matchDetailed, rarityLevels };
+const knowledgeV4 = require('./knowledge-v4');
+const v4Summary = knowledgeV4.configure(questions);
+function matchDetailed(question, input) {
+  const original = matchOriginal(question,input);
+  return original || knowledgeV4.match(question,input);
+}
+function lookup(question,input) { return matchDetailed(question,input)?.answer ?? null; }
+module.exports = { questions, lookup, norm, matchDetailed, rarityLevels, v4Summary };
