@@ -249,13 +249,16 @@ const geographySummary = knowledgeV4.configure(questions);
 const wordnetSummary = wordnetV4.configure(questions);
 const v4Summary = Object.freeze({
   ...geographySummary,
-  version:'4.1.0-reviewed',
+  version:'4.2.0-reviewed',
   questionCount:geographySummary.questionCount+wordnetSummary.questionCount,
   exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys,
   wordnetAnswers:wordnetSummary.answers,
   wordnetExactKeys:wordnetSummary.exactKeys,
   wordnetQuestionCount:wordnetSummary.questionCount,
-  wordnetRuntimeExclusions:wordnetSummary.rejectedAtRuntime
+  wordnetRuntimeExclusions:wordnetSummary.rejectedAtRuntime,
+  phase3Verified:wordnetV4.data.summary.phase3Curated,
+  phase3Review:wordnetV4.data.summary.phase3Review,
+  phase3Rejected:wordnetV4.data.summary.phase3Rejected
 });
 function matchDetailed(question, input) {
   const original = matchOriginal(question,input);

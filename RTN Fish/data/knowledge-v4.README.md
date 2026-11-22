@@ -36,3 +36,35 @@ separate 1,487-row Review ledger, and only the 140 approved IDs are exported.
   https://github.com/globalwordnet/english-wordnet and
   https://github.com/Salah-Sal/arabic-wordnet-v4 . AWN4 describes its Arabic
   translation process as AI-assisted; omitted labels remain Review.
+
+## V4.2 carefully screened third batch
+
+V4.2 retains all 959 V4.0 cities and the original 140 V4.1 WordNet entries,
+then adds **320 specific bilingual concepts** for the six existing prompts
+fruits (55), vegetables (56), plants/trees (30), minerals (74), dinosaurs (15)
+and fish (90). There are now 460 WordNet bilingual concepts across 9 scoped
+questions, plus 959 city concepts across 28 geography questions. This yields
+1,419 additional V4 answer concepts and 2,838 exact normalized keys across
+37 scoped question contexts, without changing the original 382 questions.
+
+- `scripts/build-v4-phase3-reviewed.py` takes the independent 5,767-row
+  `V4_PHASE3_WORDNET_REVIEW.json` research ledger and the existing V4.1 runtime,
+  exports an exact bilingual runtime subset, and writes a three-state
+  adjudication ledger (320 `Verified`, 5,436 `Review`, 11 `Rejected`). The raw
+  368 MB research database and the full review ledger are **not deployed**.
+- Source IDs, synset and ILI are preserved per verified row; the runtime JSON
+  also contains original source URLs, CC BY 4.0 licenses, source SHA-256
+  digests and UTC import timestamps for Open English WordNet 2024 and Arabic
+  WordNet 4.1. AI-generated source translations require human semantic review.
+- Short/generic/dubious labels and wrong category links were withheld; example
+  rejects include `Chinese celery` / `ملفوف صيني`, `julienne`, `earth color`,
+  `bottom-feeder`, and a contradictory flying-fish translation.
+- New answers are exact-match only and share a concept ID across Arabic and
+  English. The existing game matcher, input normalization, score tiers,
+  answer quotas, question selection, multiplayer logic, and UI are unchanged.
+- Tests validate every verified pair, collisions against the previous fuzzy
+  matcher, rejected phrases, question isolation, Arabic diacritics, lookup
+  performance, health summary, and multiplayer behavior.
+
+Attribution: https://github.com/globalwordnet/english-wordnet (CC BY 4.0);
+https://github.com/Salah-Sal/arabic-wordnet-v4 (CC BY 4.0).
