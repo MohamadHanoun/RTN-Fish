@@ -246,14 +246,18 @@ require('./knowledge-v3').enhanceQuestions(questions);
 const knowledgeV4 = require('./knowledge-v4');
 const wordnetV4 = require('./knowledge-v4-wordnet');
 const wordnetV43 = require('./knowledge-v43');
+const wordnetV44Land = require('./knowledge-v44-land');
+const wordnetV44Alias = require('./knowledge-v44-alias');
 const geographySummary = knowledgeV4.configure(questions);
 const wordnetSummary = wordnetV4.configure(questions);
 const v43Summary = wordnetV43.configure(questions);
+const v44LandSummary = wordnetV44Land.configure(questions);
+const v44Summary = wordnetV44Alias.configure(questions);
 const v4Summary = Object.freeze({
   ...geographySummary,
-  version:'4.3.0-reviewed',
-  questionCount:geographySummary.questionCount+wordnetSummary.questionCount+v43Summary.questionCount,
-  exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys+v43Summary.exactKeys,
+  version:'4.4.0-reviewed',
+  questionCount:geographySummary.questionCount+wordnetSummary.questionCount+v43Summary.questionCount+v44LandSummary.questionCount,
+  exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys+v43Summary.exactKeys+v44LandSummary.exactKeys+v44Summary.aliases,
   wordnetAnswers:wordnetSummary.answers,
   wordnetExactKeys:wordnetSummary.exactKeys,
   wordnetQuestionCount:wordnetSummary.questionCount,
@@ -262,6 +266,16 @@ const v4Summary = Object.freeze({
   v43ExactKeys:v43Summary.exactKeys,
   v43QuestionCount:v43Summary.questionCount,
   v43RuntimeExclusions:v43Summary.rejectedAtRuntime,
+  v44LandAnswers:v44LandSummary.answers,
+  v44LandExactKeys:v44LandSummary.exactKeys,
+  v44LandQuestionCount:v44LandSummary.questionCount,
+  v44LandRuntimeExclusions:v44LandSummary.rejectedAtRuntime,
+  v44LandReviewRemaining:wordnetV44Land.data.summary.totalPhase4Review,
+  v44VerifiedAliases:v44Summary.aliases,
+  v44AliasQuestionCount:v44Summary.questionCount,
+  v44RuntimeExclusions:v44Summary.rejectedAtRuntime,
+  v44AliasReview:wordnetV44Alias.data.summary.review,
+  v44AliasRejected:wordnetV44Alias.data.summary.rejected,
   phase4Verified:wordnetV43.data.summary.curatedPairs,
   phase4Review:wordnetV43.data.summary.review,
   phase4Rejected:wordnetV43.data.summary.rejected,
@@ -272,7 +286,7 @@ const v4Summary = Object.freeze({
 });
 function matchDetailed(question, input) {
   const original = matchOriginal(question,input);
-  return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input) || wordnetV43.match(question,input);
+  return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input) || wordnetV43.match(question,input) || wordnetV44Land.match(question,input) || wordnetV44Alias.match(question,input);
 }
 function lookup(question,input) { return matchDetailed(question,input)?.answer ?? null; }
 module.exports = { questions, lookup, norm, matchDetailed, rarityLevels, v4Summary };

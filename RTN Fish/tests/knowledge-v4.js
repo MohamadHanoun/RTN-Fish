@@ -6,7 +6,7 @@ const { match: v4Match, data } = require('../data/knowledge-v4');
 const { matchDetailed: legacyMatch, norm } = require('../data/matcher');
 
 assert.equal(questions.length,382);
-assert.equal(v4Summary.version,'4.3.0-reviewed');
+assert.equal(v4Summary.version,'4.4.0-reviewed');
 assert.equal(data.version,'4.0.0-geo-verified');
 assert(v4Summary.cityAnswers > 500, 'expected conservative city additions');
 assert(v4Summary.cityAnswers <= data.summary.acceptedSourceCandidates);
@@ -56,4 +56,4 @@ const t0=process.hrtime.bigint();
 for (let i=0;i<1000;i++) v4Match(us,'شبرا الخيمة');
 const ms=Number(process.hrtime.bigint()-t0)/1e6;
 assert(ms<200,`V4 1000 exact checks too slow: ${ms.toFixed(2)}ms`);
-console.log(`PASS: V4 ${v4Summary.cityAnswers} scoped bilingual cities, ${v4Summary.exactKeys-v4Summary.wordnetExactKeys-v4Summary.v43ExactKeys} city keys, ${v4Summary.questionCount-v4Summary.wordnetQuestionCount-v4Summary.v43QuestionCount} geography questions; 1000 lookups in ${ms.toFixed(2)}ms`);
+console.log(`PASS: V4 ${v4Summary.cityAnswers} scoped bilingual cities, ${v4Summary.exactKeys-v4Summary.wordnetExactKeys-v4Summary.v43ExactKeys-v4Summary.v44LandExactKeys-v4Summary.v44VerifiedAliases} city keys, ${v4Summary.questionCount-v4Summary.wordnetQuestionCount-v4Summary.v43QuestionCount-v4Summary.v44LandQuestionCount} geography questions; 1000 lookups in ${ms.toFixed(2)}ms`);

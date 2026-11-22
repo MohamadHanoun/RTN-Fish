@@ -6,14 +6,14 @@ const {match,data}=require('../data/knowledge-v43');
 const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
 
 assert.equal(questions.length,382);
-assert.equal(v4Summary.version,'4.3.0-reviewed');
+assert.equal(v4Summary.version,'4.4.0-reviewed');
 assert.equal(v4Summary.cityAnswers,959);
 assert.equal(v4Summary.wordnetAnswers,460);
 assert.equal(v4Summary.v43Answers,72);
 assert.equal(v4Summary.v43ExactKeys,144);
 assert.equal(v4Summary.v43QuestionCount,8);
 assert.equal(v4Summary.v43RuntimeExclusions,0);
-assert.equal(v4Summary.exactKeys,2982);
+assert.equal(v4Summary.exactKeys,3129);
 assert.equal(v4Summary.phase4Verified,72);
 assert.equal(v4Summary.phase4Review,1922);
 assert.equal(v4Summary.phase4Rejected,17);
