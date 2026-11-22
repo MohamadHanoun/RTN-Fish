@@ -5,14 +5,14 @@ const {questions,matchDetailed,v4Summary}=require('../data/questions');
 const {match,data}=require('../data/knowledge-v44-land');
 const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
 
-assert.equal(v4Summary.version,'4.4.0-reviewed');
+assert.equal(v4Summary.version,'4.5.0-reviewed');
 assert.equal(v4Summary.v44LandAnswers,18);
 assert.equal(v4Summary.v44LandExactKeys,36);
 assert.equal(v4Summary.v44LandQuestionCount,1);
 assert.equal(v4Summary.v44LandRuntimeExclusions,0);
 assert.equal(v4Summary.v44LandReviewRemaining,1904);
 assert.equal(v4Summary.questionCount,46);
-assert.equal(v4Summary.exactKeys,3129);
+assert.equal(v4Summary.exactKeys,3737);
 assert.equal(data.unverifiedExcluded,true);
 assert.equal(data.summary.curatedPairs,18);
 assert.equal(data.summary.totalPhase4Verified,90);

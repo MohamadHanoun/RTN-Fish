@@ -42,14 +42,14 @@ async function main(){
   }
   const health=await (await fetch(`http://127.0.0.1:${PORT}/health`)).json();
   assert.equal(health.ok,true);
-  assert.equal(health.knowledgeV4.version,'4.4.0-reviewed');
+  assert.equal(health.knowledgeV4.version,'4.5.0-reviewed');
   assert(health.knowledgeV4.cityAnswers>500);
   assert.equal(health.knowledgeV4.wordnetAnswers,460);
   assert.equal(health.knowledgeV4.wordnetExactKeys,920);
   assert.equal(health.knowledgeV4.v43Answers,72);
   assert.equal(health.knowledgeV4.v43ExactKeys,144);
-  assert.equal(health.knowledgeV4.phase4Verified,72);
-  assert.equal(health.knowledgeV4.phase4Review,1922);
+  assert.equal(health.knowledgeV4.phase4Verified,394);
+  assert.equal(health.knowledgeV4.phase4Review,1600);
   assert.equal(health.knowledgeV4.phase4Rejected,17);
   assert.equal(health.knowledgeV4.v44VerifiedAliases,111);
   assert.equal(health.knowledgeV4.v44AliasReview,346);
@@ -58,7 +58,11 @@ async function main(){
   assert.equal(health.knowledgeV4.v44LandAnswers,18);
   assert.equal(health.knowledgeV4.v44LandExactKeys,36);
   assert.equal(health.knowledgeV4.v44LandRuntimeExclusions,0);
-  assert.equal(health.knowledgeV4.exactKeys,3129);
+  assert.equal(health.knowledgeV4.v45Answers,304);
+  assert.equal(health.knowledgeV4.v45ExactKeys,608);
+  assert.equal(health.knowledgeV4.v45QuestionCount,8);
+  assert.equal(health.knowledgeV4.v45RuntimeExclusions,0);
+  assert.equal(health.knowledgeV4.exactKeys,3737);
   assert.equal(health.knowledgeV4.phase3Verified,320);
   assert.equal(health.knowledgeV4.phase3Review,5436);
   assert.equal(health.knowledgeV4.phase3Rejected,11);
