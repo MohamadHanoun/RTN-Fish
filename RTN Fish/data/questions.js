@@ -245,24 +245,34 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
 require('./knowledge-v3').enhanceQuestions(questions);
 const knowledgeV4 = require('./knowledge-v4');
 const wordnetV4 = require('./knowledge-v4-wordnet');
+const wordnetV43 = require('./knowledge-v43');
 const geographySummary = knowledgeV4.configure(questions);
 const wordnetSummary = wordnetV4.configure(questions);
+const v43Summary = wordnetV43.configure(questions);
 const v4Summary = Object.freeze({
   ...geographySummary,
-  version:'4.2.0-reviewed',
-  questionCount:geographySummary.questionCount+wordnetSummary.questionCount,
-  exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys,
+  version:'4.3.0-reviewed',
+  questionCount:geographySummary.questionCount+wordnetSummary.questionCount+v43Summary.questionCount,
+  exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys+v43Summary.exactKeys,
   wordnetAnswers:wordnetSummary.answers,
   wordnetExactKeys:wordnetSummary.exactKeys,
   wordnetQuestionCount:wordnetSummary.questionCount,
   wordnetRuntimeExclusions:wordnetSummary.rejectedAtRuntime,
+  v43Answers:v43Summary.answers,
+  v43ExactKeys:v43Summary.exactKeys,
+  v43QuestionCount:v43Summary.questionCount,
+  v43RuntimeExclusions:v43Summary.rejectedAtRuntime,
+  phase4Verified:wordnetV43.data.summary.curatedPairs,
+  phase4Review:wordnetV43.data.summary.review,
+  phase4Rejected:wordnetV43.data.summary.rejected,
+  phase4AliasReview:wordnetV43.data.summary.aliasReview,
   phase3Verified:wordnetV4.data.summary.phase3Curated,
   phase3Review:wordnetV4.data.summary.phase3Review,
   phase3Rejected:wordnetV4.data.summary.phase3Rejected
 });
 function matchDetailed(question, input) {
   const original = matchOriginal(question,input);
-  return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input);
+  return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input) || wordnetV43.match(question,input);
 }
 function lookup(question,input) { return matchDetailed(question,input)?.answer ?? null; }
 module.exports = { questions, lookup, norm, matchDetailed, rarityLevels, v4Summary };

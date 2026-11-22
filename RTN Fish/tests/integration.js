@@ -42,10 +42,15 @@ async function main(){
   }
   const health=await (await fetch(`http://127.0.0.1:${PORT}/health`)).json();
   assert.equal(health.ok,true);
-  assert.equal(health.knowledgeV4.version,'4.2.0-reviewed');
+  assert.equal(health.knowledgeV4.version,'4.3.0-reviewed');
   assert(health.knowledgeV4.cityAnswers>500);
   assert.equal(health.knowledgeV4.wordnetAnswers,460);
   assert.equal(health.knowledgeV4.wordnetExactKeys,920);
+  assert.equal(health.knowledgeV4.v43Answers,72);
+  assert.equal(health.knowledgeV4.v43ExactKeys,144);
+  assert.equal(health.knowledgeV4.phase4Verified,72);
+  assert.equal(health.knowledgeV4.phase4Review,1922);
+  assert.equal(health.knowledgeV4.phase4Rejected,17);
   assert.equal(health.knowledgeV4.phase3Verified,320);
   assert.equal(health.knowledgeV4.phase3Review,5436);
   assert.equal(health.knowledgeV4.phase3Rejected,11);
