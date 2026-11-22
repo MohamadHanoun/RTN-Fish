@@ -1,13 +1,13 @@
 {
   "name": "rtn-fish",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "private": true,
   "type": "commonjs",
   "description": "Original Arabic browser multiplayer game with built-in WebSocket server, no dependencies",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node tests/knowledge-v3.js && node tests/knowledge-v4.js && node tests/content.js && node tests/client-adapter.js && node tests/integration.js"
+    "test": "node tests/knowledge-v3.js && node tests/knowledge-v4.js && node tests/knowledge-v4-wordnet.js && node tests/content.js && node tests/client-adapter.js && node tests/integration.js"
   },
   "engines": {
     "node": ">=18"

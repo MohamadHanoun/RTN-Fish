@@ -1,0 +1,76 @@
+'use strict';
+
+const assert=require('node:assert/strict');
+const {questions,matchDetailed,v4Summary}=require('../data/questions');
+const {match,data}=require('../data/knowledge-v4-wordnet');
+const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
+
+assert.equal(questions.length,382);
+assert.equal(v4Summary.version,'4.1.0-reviewed');
+assert.equal(v4Summary.wordnetQuestionCount,3);
+assert.equal(v4Summary.wordnetAnswers,140);
+assert.equal(v4Summary.wordnetExactKeys,280);
+assert.equal(v4Summary.wordnetRuntimeExclusions,0);
+assert.equal(v4Summary.cityAnswers,959);
+assert.equal(v4Summary.exactKeys,2198);
+assert.equal(data.summary.curatedPairs,140);
+assert.equal(data.unverifiedExcluded,true);
+assert.equal(Object.keys(data.questions).length,3);
+
+let verified=0;
+for(const [id,rows] of Object.entries(data.questions)) {
+  const question=questions[Number(id)-1];
+  assert(question && question.id===Number(id));
+  const aliasOwners=new Map();
+  for(const row of rows) {
+    const [conceptId,ar,en,synset,ili,status]=row;
+    assert.equal(status,'Verified');
+    assert(conceptId.startsWith('wn:') && synset.startsWith('oewn-') && ili);
+    assert(/[؀-ۿ]/.test(ar) && /[a-z]/i.test(en));
+    assert.equal(matchLegacy(question,ar),null,'no fuzzy legacy collision for '+ar);
+    assert.equal(matchLegacy(question,en),null,'no fuzzy legacy collision for '+en);
+    const arMatch=match(question,ar),enMatch=match(question,en);
+    assert(arMatch && enMatch,'both language labels must work');
+    assert.equal(arMatch.kind,'v4-wordnet-exact');
+    assert.equal(arMatch.answer.conceptId,conceptId);
+    assert.equal(enMatch.answer.conceptId,conceptId);
+    assert.equal(arMatch.answer.display,enMatch.answer.display);
+    assert.equal(matchDetailed(question,ar).answer.conceptId,conceptId);
+    assert.equal(matchDetailed(question,en).answer.conceptId,conceptId);
+    assert.equal(arMatch.answer.rarity,'common');
+    assert.equal(arMatch.answer.value,10);
+    assert.equal(arMatch.answer.timeBonus,0);
+    for(const alias of [ar,en]) {
+      const normalized=norm(alias);
+      assert(!aliasOwners.has(normalized),'two concepts claim '+normalized+' within question');
+      aliasOwners.set(normalized,conceptId);
+    }
+    verified++;
+  }
+}
+assert.equal(verified,140);
+const bird=questions.find(q=>q.prompt==='اذكر طائرًا');
+const insect=questions.find(q=>q.prompt==='اذكر حشرة');
+const instrument=questions.find(q=>q.prompt==='اذكر آلة موسيقية');
+const city=questions.find(q=>q.prompt==='اذكر مدينة في السعودية');
+assert.equal(match(bird,'albatross')?.answer.display,'قطرس');
+assert.equal(match(insect,'honeybee')?.answer.display,'نحل العسل');
+assert.equal(match(instrument,'bagpipe')?.answer.display,'مزمار القربة');
+assert.equal(match(bird,'bagpipe'),null);
+assert.equal(match(instrument,'albatross'),null);
+assert.equal(match(insect,'kingfisher'),null);
+assert.equal(match(city,'albatross'),null);
+assert.equal(match(bird,'albatro'),null);
+assert.equal(match(insect,'pollinator'),null);
+assert.equal(match(bird,'cassowary'),null);
+assert.equal(match(bird,'mallard'),null);
+assert.equal(match(bird,'random made up bird'),null);
+assert.equal(match(instrument,''),null);
+const answer=match(bird,'albatross').answer;
+const used=new Set([norm(answer.display)]);
+assert(used.has(norm(match(bird,'قطرس').answer.display)),'Arabic and English share one use slot');
+const t0=process.hrtime.bigint();
+for(let i=0;i<1000;i++)match(instrument,'bagpipe');
+const ms=Number(process.hrtime.bigint()-t0)/1e6;
+assert(ms<200,`WordNet V4 1000 exact lookups too slow: ${ms.toFixed(2)}ms`);
+console.log(`PASS: V4.1 ${verified} editorially scoped bilingual entries in 3 categories, 280 exact keys; 1000 lookups in ${ms.toFixed(2)}ms`);

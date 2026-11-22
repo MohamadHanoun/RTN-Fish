@@ -42,8 +42,10 @@ async function main(){
   }
   const health=await (await fetch(`http://127.0.0.1:${PORT}/health`)).json();
   assert.equal(health.ok,true);
-  assert.equal(health.knowledgeV4.version,'4.0.0-geo-verified');
+  assert.equal(health.knowledgeV4.version,'4.1.0-reviewed');
   assert(health.knowledgeV4.cityAnswers>500);
+  assert.equal(health.knowledgeV4.wordnetAnswers,140);
+  assert.equal(health.knowledgeV4.wordnetExactKeys,280);
   const a=new Client(),b=new Client();
   await a.connect();await b.connect();
   let r=await a.send('createRoom',{name:'ليلى',maxPlayers:3,hearts:3,fuseMinSec:6,fuseMaxSec:8,mode:'gaming'});

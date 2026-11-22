@@ -244,10 +244,22 @@ const questions = allRaw.map(([prompt, serialized], idx) => {
 });
 require('./knowledge-v3').enhanceQuestions(questions);
 const knowledgeV4 = require('./knowledge-v4');
-const v4Summary = knowledgeV4.configure(questions);
+const wordnetV4 = require('./knowledge-v4-wordnet');
+const geographySummary = knowledgeV4.configure(questions);
+const wordnetSummary = wordnetV4.configure(questions);
+const v4Summary = Object.freeze({
+  ...geographySummary,
+  version:'4.1.0-reviewed',
+  questionCount:geographySummary.questionCount+wordnetSummary.questionCount,
+  exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys,
+  wordnetAnswers:wordnetSummary.answers,
+  wordnetExactKeys:wordnetSummary.exactKeys,
+  wordnetQuestionCount:wordnetSummary.questionCount,
+  wordnetRuntimeExclusions:wordnetSummary.rejectedAtRuntime
+});
 function matchDetailed(question, input) {
   const original = matchOriginal(question,input);
-  return original || knowledgeV4.match(question,input);
+  return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input);
 }
 function lookup(question,input) { return matchDetailed(question,input)?.answer ?? null; }
 module.exports = { questions, lookup, norm, matchDetailed, rarityLevels, v4Summary };
