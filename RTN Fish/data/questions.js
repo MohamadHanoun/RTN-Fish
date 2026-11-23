@@ -157,7 +157,7 @@ const raw = [
   ['اذكر شيئًا لونه أخضر عادةً', 'عشب,خس,خيار,سبانخ,تفاح أخضر,ليمون أخضر,نعناع,بقدونس,شجرة,بروكلي,كوسا,أفوكادو,فلفل أخضر,زيتون,بازلاء'],
   ['اذكر شيئًا باردًا', 'ثلج,آيس كريم,ماء بارد,شتاء,ثلاجة,فريزر,عصير,بحر,مكيف,عصير مثلج,صقيع,مطر,ثلج مجروش,مصاصة مثلجة'],
   ['اذكر شيئًا ساخنًا', 'شمس,نار,فرن,شاي,قهوة,حساء,مدفأة,ماء مغلي,فحم,حمم بركانية,شوربة,مكواة,صحراء,شواية,بخار'],
-  ['اذكر شيئًا دائري الشكل', 'كرة,عجلة,طبق,ساعة,عملة,بيتزا,برتقال,شمس,قمر,خاتم,دونات,قرص مدمج,بالون,طاولة دائرية,غطاء قدر'],
+  ['اذكر شيئًا دائري الشكل', 'كرة|Ball,عجلة,طبق,ساعة,عملة,بيتزا,برتقال,شمس,قمر,خاتم,دونات,قرص مدمج,بالون,طاولة دائرية,غطاء قدر'],
   ['اذكر شيئًا له أجنحة', 'طائر,فراشة,طائرة,نحلة,ذبابة,بعوضة,نسر,خفاش,دجاجة,خنفساء,يعسوب,صقر,حمامة,بطريق,ملاك,جرادة,طائرة ورقية'],
   ['اذكر شيئًا يصدر صوتًا عاليًا', 'رعد,انفجار,صفارة,سيارة إسعاف,سيارة شرطة,جرس,منبه,موسيقى,قطار,طائرة,شاحنة,بوق,أسد,كلب,مفرقعات,دراجة نارية,مروحية'],
   ['اذكر شيئًا يصدر رائحة جميلة', 'ورد,عطر,ياسمين,قهوة,خبز طازج,صابون,بخور,شامبو,كعك,فانيليا,نعناع,ريحان,مسك,لافندر,برتقال,ليمون,شوكولاتة'],
@@ -257,7 +257,7 @@ const v44Summary = wordnetV44Alias.configure(questions);
 const v45Summary = wordnetV45.configure(questions);
 const v4Summary = Object.freeze({
   ...geographySummary,
-  version:'4.5.0-reviewed',
+  version:'4.5.1-reviewed-matcher',
   questionCount:geographySummary.questionCount+wordnetSummary.questionCount+v43Summary.questionCount+v44LandSummary.questionCount,
   exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys+v43Summary.exactKeys+v44LandSummary.exactKeys+v44Summary.aliases+v45Summary.exactKeys,
   wordnetAnswers:wordnetSummary.answers,
@@ -292,7 +292,7 @@ const v4Summary = Object.freeze({
   phase3Rejected:wordnetV4.data.summary.phase3Rejected
 });
 function matchDetailed(question, input) {
-  const original = matchOriginal(question,input);
+  const original = matchOriginal(question,input,{safe:true});
   return original || knowledgeV4.match(question,input) || wordnetV4.match(question,input) || wordnetV43.match(question,input) || wordnetV44Land.match(question,input) || wordnetV44Alias.match(question,input) || wordnetV45.match(question,input);
 }
 function lookup(question,input) { return matchDetailed(question,input)?.answer ?? null; }

@@ -6,7 +6,7 @@ const {data,match}=require('../data/knowledge-v44-alias');
 const wordnet=require('../data/knowledge-v4-wordnet');
 const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
 
-assert.equal(v4Summary.version,'4.5.0-reviewed');
+assert.equal(v4Summary.version,'4.5.1-reviewed-matcher');
 assert.equal(v4Summary.questionCount,46,'aliases must not count as new question categories');
 assert.equal(v4Summary.cityAnswers,959);
 assert.equal(v4Summary.wordnetAnswers,460);

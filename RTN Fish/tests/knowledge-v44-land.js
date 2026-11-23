@@ -5,7 +5,7 @@ const {questions,matchDetailed,v4Summary}=require('../data/questions');
 const {match,data}=require('../data/knowledge-v44-land');
 const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
 
-assert.equal(v4Summary.version,'4.5.0-reviewed');
+assert.equal(v4Summary.version,'4.5.1-reviewed-matcher');
 assert.equal(v4Summary.v44LandAnswers,18);
 assert.equal(v4Summary.v44LandExactKeys,36);
 assert.equal(v4Summary.v44LandQuestionCount,1);

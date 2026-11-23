@@ -6,7 +6,7 @@ const {match,data}=require('../data/knowledge-v4-wordnet');
 const {matchDetailed:matchLegacy,norm}=require('../data/matcher');
 
 assert.equal(questions.length,382);
-assert.equal(v4Summary.version,'4.5.0-reviewed');
+assert.equal(v4Summary.version,'4.5.1-reviewed-matcher');
 assert.equal(v4Summary.wordnetQuestionCount,9);
 assert.equal(v4Summary.wordnetAnswers,460);
 assert.equal(v4Summary.wordnetExactKeys,920);

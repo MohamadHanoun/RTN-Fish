@@ -121,34 +121,53 @@
     }
     return prev[b.length];
   }
-  // اللعب متسامح: يمكن إدخال بداية الاسم أو هجاء تقريبي. إذا تعادل جوابان
-  // نرجّح الأكثر شيوعًا في الفئة، بدل أن نتوقف بلا أي تخمين.
-  function errorLimit(attempt, candidate) {
+  // Only narrowly scoped, high-confidence typos are safe to accept automatically.
+  // Latin prefixes can be standalone words (Ball/Balloon, Car/Card), so never guess them.
+  function errorLimit(attempt, candidate, safe) {
     const length = Math.max(attempt.length, candidate.length);
-    if (attempt.length < 3 || length > 55) return 0;
-    if (length <= 4) return 1;
-    if (length <= 7) return 2;
-    if (length <= 12) return 3;
-    return 4;
+    if (!safe) {
+      if (attempt.length < 3 || length > 55) return 0;
+      if (length <= 4) return 1;
+      if (length <= 7) return 2;
+      if (length <= 12) return 3;
+      return 4;
+    }
+    if (length > 55) return 0;
+    if (/[a-z]/i.test(attempt) ? attempt.length < 6 : attempt.length < 4) return 0;
+    return length <= 8 ? 1 : 2;
   }
   const keyCache = new WeakMap();
   function keysFor(question) {
     let cached = keyCache.get(question);
     if (!cached) {
-      cached = question.answers.map(answer => {
+      const exactOwners = new Map();
+      const keysByAnswer = question.answers.map((answer,index) => {
         const keys = new Set();
-        for (const alias of answer.aliases) for (const variant of variants(alias)) keys.add(variant);
+        for (const alias of answer.aliases) {
+          const exact=norm(alias);
+          if(exact && !exactOwners.has(exact)) exactOwners.set(exact,index);
+          for (const variant of variants(alias)) keys.add(variant);
+        }
         return [...keys];
       });
+      cached={exactOwners,keysByAnswer};
       keyCache.set(question, cached);
     }
     return cached;
   }
-  function matchDetailed(question, input) {
+  function matchDetailed(question, input, options) {
+    const safe=options?.safe===true;
     const attempted = norm(input);
     if (!question || !Array.isArray(question.answers) || !attempted || attempted.length > 70) return null;
-    const keysByAnswer = keysFor(question);
-    // Matching exact (including colloquial synonyms) always wins over fuzzy matches.
+    const {exactOwners,keysByAnswer}=keysFor(question);
+    // The complete name must beat an article-stripped variant of a different concept.
+    // For example, جبيل (Byblos) is not الجبيل (Jubail).
+    const exactOwner=exactOwners.get(attempted);
+    if(safe && exactOwner!==undefined) return {
+      answer:question.answers[exactOwner],
+      kind:norm(question.answers[exactOwner].display)===attempted?'exact':'synonym'
+    };
+    // Only after strict alias lookup, try orthographic variants and cautious typos.
     for (let i = 0; i < keysByAnswer.length; i++) {
       if (keysByAnswer[i].includes(attempted)) return {
         answer: question.answers[i], kind: norm(question.answers[i].display) === attempted ? 'exact' : 'synonym'
@@ -160,18 +179,22 @@
     for (let i = 0; i < keysByAnswer.length; i++) {
       let best = -Infinity, bestKind = null;
       for (const key of keysByAnswer[i]) {
-        if (attempted.length >= 2 && attempted.length < key.length && key.startsWith(attempted)
-          && (attempted.length >= 3 ? attempted.length / key.length >= 0.34 : attempted.length / key.length >= 0.6)) {
-          // Perfect prefix is stronger than edit matching. Shorter completion preferred.
+        if ((!safe && attempted.length >= 2 && attempted.length < key.length
+          && key.startsWith(attempted)
+          && (attempted.length >= 3 ? attempted.length / key.length >= 0.34 : attempted.length / key.length >= 0.6))
+          || (safe && /^[\u0600-\u06ff\s]+$/.test(attempted)
+          && attempted.length >= 5 && attempted.length < key.length
+          && attempted.length / key.length >= 0.75 && key.startsWith(attempted))) {
+          // Retain narrowly scoped Arabic name completion, not arbitrary short fragments.
           const score = 110 + attempted.length / key.length * 30;
           if (score > best) { best = score; bestKind = 'partial'; }
         }
-        const limit = errorLimit(attempted, key);
+        const limit = errorLimit(attempted, key, safe);
         if (!limit || Math.abs(key.length - attempted.length) > limit) continue;
         const dist = damerau(attempted, key, limit);
         if (dist > limit) continue;
         const similarity = 1 - dist / Math.max(key.length, attempted.length);
-        if (similarity < 0.55) continue;
+        if (similarity < (safe?0.75:0.55)) continue;
         // Closer match beats popularity. Ties favor earlier (more familiar) answers.
         const score = 80 + similarity * 30 - dist * 1.5;
         if (score > best) { best = score; bestKind = 'typo'; }
@@ -180,6 +203,7 @@
     }
     if (!proposals.length) return null;
     proposals.sort((a,b) => b.score - a.score || a.order - b.order);
+    if (safe && proposals.length > 1 && proposals[0].score - proposals[1].score < 3) return null;
     return { answer: proposals[0].answer, kind: proposals[0].kind };
   }
   function lookup(question, input) { return matchDetailed(question, input)?.answer ?? null; }

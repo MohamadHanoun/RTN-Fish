@@ -6,7 +6,7 @@ const { match: v4Match, data } = require('../data/knowledge-v4');
 const { matchDetailed: legacyMatch, norm } = require('../data/matcher');
 
 assert.equal(questions.length,382);
-assert.equal(v4Summary.version,'4.5.0-reviewed');
+assert.equal(v4Summary.version,'4.5.1-reviewed-matcher');
 assert.equal(data.version,'4.0.0-geo-verified');
 assert(v4Summary.cityAnswers > 500, 'expected conservative city additions');
 assert(v4Summary.cityAnswers <= data.summary.acceptedSourceCandidates);
