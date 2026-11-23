@@ -78,11 +78,11 @@ async function main(){
   assert.equal(new Set(a.room.players.map(p=>p.avatar)).size,a.room.players.length,'animal avatars are unique within a room');
   const initialAvatars=new Map(a.room.players.map(p=>[p.id,p.avatar]));
   r=await b.send('updateSettings',{hearts:8});assert.equal(r.ok,false,'guest cannot edit host settings');
-  r=await a.send('updateSettings',{hearts:2,maxPlayers:4,fuseMinSec:6,fuseMaxSec:8,mode:'gaming'});
+  r=await a.send('updateSettings',{hearts:3,maxPlayers:4,fuseMinSec:6,fuseMaxSec:8,mode:'gaming'});
   assert.equal(r.ok,true);
   await sleep(60);
-  assert.equal(b.room.settings.hearts,2,'settings sync to guests');
-  assert.equal(b.room.players[0].hearts,2,'changed hearts applied');
+  assert.equal(b.room.settings.hearts,3,'settings sync to guests');
+  assert.equal(b.room.players[0].hearts,3,'changed hearts applied');
   r=await a.send('startGame',{});assert.equal(r.ok,true);
   await sleep(90);
   assert(a.room.fuseEndsAt>Date.now(),'every player receives a visible server countdown');
@@ -112,7 +112,7 @@ async function main(){
   assert.equal(r.gainedTime,7);
   await sleep(100);
   assert.equal(first.room.players.find(p=>p.id===first.id).lastAnswer,legendary.display,'the submitted word is shown beside the player');
-  assert.equal(first.room.players.find(p=>p.id===first.id).hearts,3);
+  assert.equal(first.room.players.find(p=>p.id===first.id).hearts,4);
   assert.equal(first.room.players.find(p=>p.id===first.id).timeBonus,7);
   assert.equal(first.room.currentPlayerId,second.id);
   assert(second.room.fuseDurationMs>=6000&&second.room.fuseDurationMs<=8000,'a correct answer must give the next player a fresh full timer');
@@ -120,27 +120,23 @@ async function main(){
   assert(second.room.fuseEndsAt-Date.now()>5600,'the next player gets a full turn, not the previous player\'s remainder');
   const common=q.answers.find(x=>x.rarity==='common'&&matchDetailed(q,x.display)?.answer===x);
   assert(common);
-  await sleep(Math.max(0,second.room.fuseEndsAt-Date.now()-3000));
-  r=await second.send('submitAnswer',{answer:common.display});
+  await sleep(Math.max(0,second.room.fuseEndsAt-Date.now())+300);
+  assert.equal(first.room.round,1,'an early first explosion keeps the question');
+  assert.equal(first.room.questionExplosions,1);
+  assert.equal(first.room.currentPlayerId,first.id);
+  assert.equal(first.room.fuseDurationMs,firstAllowance,'returning player gets their full allowance');
+  assert.equal(first.room.players.find(p=>p.id===second.id).hearts,2);
+  r=await first.send('submitAnswer',{answer:common.display});
   assert.equal(r.ok,true);
   await sleep(60);
-  assert.equal(second.room.currentPlayerId,first.id);
-  assert.equal(first.room.fuseDurationMs,firstAllowance,'the original player must regain their own full allowance on return');
-  assert(first.room.fuseEndsAt-Date.now()>5600,'returning to a player renews their entire turn');
-  assert.equal(first.room.usedAnswers.length,2,'accepted answers share one question');
-  assert.equal(first.room.answerGoal,requiredAnswers(q.answers.length,2),'required answers depend on category size');
-  // An explosion must cost the holder one heart and PASS the same question.
-  const initialQuestion=first.room.question;
-  await sleep(Math.max(0,first.room.fuseEndsAt-Date.now())+300);
-  assert.equal(first.room.round,1,'one failed player must not change the question');
-  assert.equal(first.room.question,initialQuestion,'failed answers keep the current question');
-  assert.equal(first.room.currentPlayerId,second.id,'fish passes to the next alive player after explosion');
-  assert.equal(second.room.fuseDurationMs,secondAllowance,'an explosion also renews the next player\'s personal time');
-  assert.equal(first.room.players.find(p=>p.id===first.id).hearts,2,'failure removes one heart');
-  // After every survivor fails without a new correct answer, switch questions.
+  assert.equal(second.room.currentPlayerId,second.id);
+  assert.equal(second.room.fuseDurationMs,secondAllowance);
+  assert.equal(second.room.usedCount,2);
+  assert.equal(second.room.questionExplosions,1,'success preserves the first explosion');
   await sleep(Math.max(0,second.room.fuseEndsAt-Date.now())+300);
-  assert.equal(first.room.round,2,'all players failing must unlock the next question');
-  assert.notEqual(first.room.question,initialQuestion);
+  assert.equal(first.room.round,2,'second explosion advances even by the same player after a success');
+  assert.equal(first.room.questionExplosions,0);
+  assert.notEqual(first.room.question,q.prompt);
   assert.notEqual(first.room.theme,questionTheme,'consecutive questions should rotate themes when available');
   assert.equal(first.room.usedAnswers.length,0,'new question resets used answers');
   assert.equal(first.room.currentPlayerId,first.id,'pass continues around the table');
@@ -237,7 +233,7 @@ async function main(){
   assert.equal(g.room.hostId,g.id,'host rights transfer to a remaining connected player');
   assert.equal(g.room.players[0].name,'الضيف');
   g.close();
-  console.log('PASS: room settings authorization, continuous matches, proportional question goals, all-failed skips and turn passing');
+  console.log('PASS: room settings authorization, continuous matches, proportional question goals, adaptive explosion transitions and turn passing');
   a.close();b.close();
 }
 main().then(()=>server.kill()).catch(e=>{server.kill();console.error('FAIL',e,stderr);process.exitCode=1});

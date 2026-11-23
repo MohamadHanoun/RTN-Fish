@@ -259,7 +259,7 @@
   function updateGame(room) {
     const mine = room.currentPlayerId === socket.id;
     const holder = room.players.find(p => p.id === room.currentPlayerId);
-    $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}`;
+    $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}${room.questionExplosions === 1 ? " · 🔥 فرصة أخيرة" : ""}`;
     $('gameHeadline').textContent = !room.currentPlayerId ? 'بانتظار عودة اللاعبين…' : mine ? 'السمكة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
     const topics = {'geography':'🌍 جغرافيا','food':'🍉 أكل ومشروبات','nature':'🦋 طبيعة','sports':'⚽ رياضة',

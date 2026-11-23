@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const { createTransport } = require('./transport');
 const { questions, norm, matchDetailed } = require('./data/questions');
-const { requiredAnswers } = require('./data/progression');
+const { requiredAnswers, advanceAfterExplosion } = require('./data/progression');
 const { server, io } = createTransport();
 const PORT = Number(process.env.PORT) || 3000;
 const rooms = new Map();
@@ -54,7 +54,7 @@ function serialize(room) {
     currentPlayerId: room.currentPlayerId,
     question: question?.prompt ?? null, theme:question?.theme ?? null,
     usedAnswers: room.usedDisplay.slice(-30), usedCount: room.used.size,
-    round: room.round, answerGoal: room.answerGoal, recent: room.recent, winnerId: room.winnerId,
+    round: room.round, questionExplosions: room.questionExplosions, answerGoal: room.answerGoal, recent: room.recent, winnerId: room.winnerId,
     phaseStarted: room.phaseStarted, fuseEndsAt: room.fuseEndsAt,
     fuseDurationMs: room.fuseDurationMs, serverNow: Date.now()
   };
@@ -140,7 +140,7 @@ function startFuseFor(room,player,applyBonus=false) {
 }
 function beginQuestion(room,preferredId=null) {
   if(activePlayers(room).length<=1) return endGame(room);
-  room.round++;room.used=new Set();room.usedDisplay=[];room.failedSinceAnswer=new Set();room.turnDurationByPlayer=new Map();
+  room.round++;room.used=new Set();room.usedDisplay=[];room.questionExplosions=0;room.turnDurationByPlayer=new Map();
   const question=chooseQuestion(room);
   room.questionId=question.id;
   room.answerGoal=requiredAnswers(question.answers.length,activePlayers(room).length);
@@ -161,16 +161,12 @@ function explode(code) {
   if(!holder) return endGame(room);
   holder.hearts=Math.max(0,holder.hearts-1);
   holder.explosions++;
-  room.failedSinceAnswer.add(holder.id);
+  room.questionExplosions++;
   clearFuse(room);
   emitFeed(room,'pop',`انفجرت السمكة عند ${holder.name} وخسر قلب!`);
   if(activePlayers(room).length<=1) return endGame(room);
-  // An explosion costs one heart and passes the fish to the NEXT living player.
-  // The same question and its used answers stay active until the answer goal is reached.
   const next=nextActive(room,holder.id);
-  if(activePlayers(room).every(p=>room.failedSinceAnswer.has(p.id))) {
-    // Everybody still alive has lost a heart without a successful answer:
-    // don't trap the group on an impossible question.
+  if(advanceAfterExplosion(room.used.size,room.answerGoal,room.questionExplosions)) {
     beginQuestion(room,next?.id);
     return;
   }
@@ -184,7 +180,6 @@ function playerDeparture(room,player,expired=false) {
   const wasHolder=room.currentPlayerId===player.id;
   const upcoming=wasHolder?nextActive(room,player.id):null;
   const wasHost=room.hostId===player.id;
-  room.failedSinceAnswer.delete(player.id);
   room.turnDurationByPlayer?.delete(player.id);
   if(expired && ['playing','ended'].includes(room.status)) {
     if(room.status==='playing')player.hearts=0;
@@ -250,7 +245,7 @@ io.on('connection',socket=>{
     const code=roomCode();
     const room={code,settings,maxHearts:Math.min(MAX_HEARTS,settings.hearts+3),hostId:socket.id,
       status:'lobby',players:[makePlayer(socket,data?.name,settings.hearts)],used:new Set(),
-      usedDisplay:[],failedSinceAnswer:new Set(),questionId:null,questionHistory:[],themeHistory:[],themeCounts:{},round:0,answerGoal:0,currentPlayerId:null,
+      usedDisplay:[],questionExplosions:0,questionId:null,questionHistory:[],themeHistory:[],themeCounts:{},round:0,answerGoal:0,currentPlayerId:null,
       fuseEndsAt:null,fuseDurationMs:null,timer:null,winnerId:null,recent:null,phaseStarted:null,lastActiveAt:Date.now()};
     rooms.set(code,room);socketRoom.set(socket.id,code);socket.join(code);broadcast(room);
     ackSafe(ack,{ok:true,code,sessionToken:room.players[0].sessionToken});
@@ -283,7 +278,6 @@ io.on('connection',socket=>{
     if(room.hostId===oldId)room.hostId=socket.id;
     if(room.currentPlayerId===oldId)room.currentPlayerId=socket.id;
     if(room.winnerId===oldId)room.winnerId=socket.id;
-    if(room.failedSinceAnswer.has(oldId)){room.failedSinceAnswer.delete(oldId);room.failedSinceAnswer.add(socket.id);}
     if(room.turnDurationByPlayer?.has(oldId)){
       const duration=room.turnDurationByPlayer.get(oldId);
       room.turnDurationByPlayer.delete(oldId);room.turnDurationByPlayer.set(socket.id,duration);
@@ -346,7 +340,6 @@ io.on('connection',socket=>{
     const answer=match.answer,key=norm(answer.display);
     if(room.used.has(key))return ackSafe(ack,{ok:false,error:`${answer.display} مستخدمة! جرّب جواب غيره`});
     room.used.add(key);room.usedDisplay.push({display:answer.display,rarity:answer.rarity,rarityLabel:answer.rarityLabel});
-    room.failedSinceAnswer.clear();
     const player=room.players.find(p=>p.id===socket.id);
     player.lastAnswer=submitted;
     player.correct++;player.score+=answer.value;player.charge+=answer.value;

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { questions, matchDetailed, norm } = require('../data/questions');
-const { requiredAnswers } = require('../data/progression');
+const { requiredAnswers, advanceAfterExplosion } = require('../data/progression');
 const animalArt = require('../public/animals');
 const checkTranslation=(prompt,typed,expected)=>{
   const q=questions.find(question=>question.prompt===prompt);
@@ -20,11 +20,17 @@ const countries = [
 ];
 
 assert.equal(new Set(questions.map(q => q.prompt)).size, questions.length, 'question prompts must be unique');
-for (const [total,expected] of [[0,0],[3,3],[5,4],[10,5],[20,9],[30,12],[100,12]]) {
-  assert.equal(requiredAnswers(total),expected,`answer goal for ${total} choices`);
+for (let players = 2; players <= 10; players++) {
+  const goal = Math.min(players + 2, 8);
+  assert.equal(requiredAnswers(100, players), goal);
+  assert.equal(requiredAnswers(3, players), 3);
+  for (let used = 0; used < goal; used++) {
+    const progress = used / goal;
+    assert.equal(advanceAfterExplosion(used, goal, 1, () => 0.499), progress >= 0.375);
+    assert.equal(advanceAfterExplosion(used, goal, 1, () => 0.5), progress >= 0.625);
+    assert.equal(advanceAfterExplosion(used, goal, 2), true);
+  }
 }
-assert.equal(requiredAnswers(100,5),30,'more players should get a larger answer goal');
-assert.equal(requiredAnswers(20,5),9,'answer-rich topics cannot end after just four words');
 assert(questions.length >= 380, 'expanded question collection should be loaded');
 const answerTotal=questions.reduce((total,q)=>total+q.answers.length,0);
 const englishTotal=questions.reduce((total,q)=>total+q.answers.reduce((sum,a)=>sum+a.aliases.filter(word=>/[a-z]/i.test(word)).length,0),0);
