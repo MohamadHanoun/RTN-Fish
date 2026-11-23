@@ -11,10 +11,10 @@ const v44Land=require('../data/knowledge-v44-land');
 const v44Alias=require('../data/knowledge-v44-alias');
 
 assert.equal(questions.length,382);
-assert.equal(v4Summary.version,'4.5.1-reviewed-matcher');
+assert.equal(v4Summary.version,'4.5.2-reviewed-matcher');
 assert.equal(v4Summary.questionCount,46,'Overlapping category additions must not inflate unique contexts');
-assert.equal(v4Summary.exactKeys,3737);
-assert.equal(v4Summary.cityAnswers,959);
+assert.equal(v4Summary.exactKeys,3733);
+assert.equal(v4Summary.cityAnswers,957);
 assert.equal(v4Summary.wordnetAnswers,460);
 assert.equal(v4Summary.v43Answers,72);
 assert.equal(v4Summary.v44LandAnswers,18);

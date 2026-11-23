@@ -1,6 +1,6 @@
 {
   "name": "rtn-fish",
-  "version": "4.5.1",
+  "version": "4.5.2",
   "private": true,
   "type": "commonjs",
   "description": "Original Arabic browser multiplayer game with built-in WebSocket server, no dependencies",

@@ -257,7 +257,7 @@ const v44Summary = wordnetV44Alias.configure(questions);
 const v45Summary = wordnetV45.configure(questions);
 const v4Summary = Object.freeze({
   ...geographySummary,
-  version:'4.5.1-reviewed-matcher',
+  version:'4.5.2-reviewed-matcher',
   questionCount:geographySummary.questionCount+wordnetSummary.questionCount+v43Summary.questionCount+v44LandSummary.questionCount,
   exactKeys:geographySummary.exactKeys+wordnetSummary.exactKeys+v43Summary.exactKeys+v44LandSummary.exactKeys+v44Summary.aliases+v45Summary.exactKeys,
   wordnetAnswers:wordnetSummary.answers,

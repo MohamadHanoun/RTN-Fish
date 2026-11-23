@@ -12,6 +12,7 @@ const round=scoped('اذكر شيئًا دائري الشكل');
 const flying=scoped('اذكر شيئًا يطير');
 const clash=scoped('اذكر بطاقة من كلاش رويال');
 const arabCities=scoped('اذكر مدينة عربية');
+const turkey=scoped('اذكر مدينة في تركيا');
 
 for(const input of ['كرة','Ball','ball','BALL']){
   const matched=matchDetailed(round,input);
@@ -27,6 +28,22 @@ assert.equal(matchDetailed(clash,'Ball'),null,'a Clash Royale Balloon card is no
 assert.equal(matchDetailed(clash,'Balloon')?.answer.display,'بالون','full card name remains accepted');
 assert.equal(matchDetailed(arabCities,'جبيل')?.answer.display,'جبيل','Byblos is not Saudi Jubail');
 assert.equal(matchDetailed(arabCities,'الجبيل')?.answer.display,'الجبيل','Jubail must retain its own identity');
+for(const [english,arabic] of [
+  ['Istanbul','إسطنبول'],['Ankara','أنقرة'],['Izmir','إزمير'],
+  ['Antalya','أنطاليا'],['Bursa','بورصة'],['Gaziantep','غازي عنتاب'],
+  ['Trabzon','طرابزون'],['Konya','قونية'],['Adana','أضنة'],
+  ['Mersin','مرسين'],['Urfa','أورفا'],['Sanliurfa','أورفا'],
+  ['Samsun','سامسون'],['Diyarbakir','ديار بكر'],['Kayseri','قيصري'],
+  ['Alanya','ألانيا']
+]){
+  const answer=matchDetailed(turkey,english);
+  assert.equal(answer?.answer.display,arabic,`trusted English city name rejected: ${english}`);
+  assert(['exact','synonym'].includes(answer.kind),`${english} must use an exact approved alias`);
+}
+assert.equal(matchDetailed(turkey,'Elephant'),null,'an animal is not a Turkish city');
+assert.equal(matchDetailed(turkey,'عنتاب')?.answer.display,'غازي عنتاب','Gaziantep must not have a duplicate identity');
+assert.equal(matchDetailed(turkey,'قيصرية')?.answer.display,'قيصري','Kayseri must not have a duplicate identity');
+assert.equal(matchDetailed(turkey,'شانلي أورفة')?.answer.display,'أورفا','Urfa old Arabic alias must remain recognized');
 assert.equal(matchDetailed(round,'Baloon')?.answer.display,'بالون','one-character English typo on longer words is supported');
 assert.equal(matchDetailed(scoped('اذكر فاكهة'),'تفاخ')?.answer.display,'تفاح','one-character Arabic typo remains supported');
 assert.equal(matchDetailed(scoped('اذكر لعبة شوتر أونلاين'),'فالورا')?.answer.display,'فالورانت','unambiguous long Arabic name completion remains supported');
