@@ -75,14 +75,12 @@
     room.players.forEach((p,i) => {
       const angle = Math.PI/2 + (2*Math.PI*(i-anchorIndex)/Math.max(count,1));
       // Keep bottom seats and their last-word bubbles above the answer dock.
-      const vertical = Math.sin(angle);
-      const x = 50 + 37*Math.cos(angle), y = 50 + (vertical > 0 ? 28 : 37)*vertical;
+      const x = 50 + 38*Math.cos(angle), y = 50 + 38*Math.sin(angle);
       const current = p.id === room.currentPlayerId;
       let seat = existing.get(p.id);
       if(!seat) {
-        seat = node('div','arena-seat');
+        seat = node('div','clock-seat');
         seat.dataset.playerId = p.id;
-        seat.append(animalAvatar(p,'arena-avatar'));
         seat.append(node('span','arena-player-name'));
         seat.append(node('span','arena-player-hearts'));
         seat.append(node('span','arena-last-word'));
@@ -90,7 +88,7 @@
         seat.append(node('span','arena-turn-label','عنده الدور'));
       }
       existing.delete(p.id);
-      seat.className = `arena-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.connected===false?'disconnected':''} ${p.id===socket.id?'my-seat':''}`;
+      seat.className = `clock-seat ${current?'on-turn':''} ${p.hearts<=0?'eliminated':''} ${p.connected===false?'disconnected':''} ${p.id===socket.id?'my-seat':''}`;
       seat.style.left = `${x}%`;
       seat.style.top = `${y}%`;
       seat.style.setProperty('--seat-delay',`${i*70}ms`);
@@ -106,10 +104,8 @@
       arena.append(seat);
     });
     const turnIndex=room.players.findIndex(p=>p.id===room.currentPlayerId);
-    // Beam rotation follows the same local perspective: 180deg points down.
-    const relativeTurn = count ? (turnIndex-anchorIndex+count)%count : 0;
-    $('arena').style.setProperty('--turn-rotation',`${turnIndex<0 ? 0 : 180+360*relativeTurn/count}deg`);
-    $('arena').classList.toggle('has-turn',turnIndex>=0);
+    window.tikTakArenaState = {players: room.players, anchorIndex, turnIndex, code: room.code, round: room.round};
+    window.dispatchEvent(new Event('tik-tak-state'));
     for (const stale of existing.values()) stale.remove();
   }
   function switchScreen(screen) {
@@ -260,7 +256,7 @@
     const mine = room.currentPlayerId === socket.id;
     const holder = room.players.find(p => p.id === room.currentPlayerId);
     $('roundLabel').textContent = `السؤال ${formatNumber(room.round)}${room.questionExplosions === 1 ? " · 🔥 فرصة أخيرة" : ""}`;
-    $('gameHeadline').textContent = !room.currentPlayerId ? 'بانتظار عودة اللاعبين…' : mine ? 'السمكة عندك!' : 'خليك جاهز!';
+    $('gameHeadline').textContent = !room.currentPlayerId ? 'بانتظار عودة اللاعبين…' : mine ? 'القنبلة عندك!' : 'خليك جاهز!';
     $('gameQuestion').textContent = room.question || '---';
     const topics = {'geography':'🌍 جغرافيا','food':'🍉 أكل ومشروبات','nature':'🦋 طبيعة','sports':'⚽ رياضة',
       'everyday':'🏡 يوميات','health-science':'🧬 علوم وصحة','technology':'💻 تقنية','entertainment':'🎬 ترفيه',
@@ -311,11 +307,11 @@
   function updateCountdown() {
     const room=state.room;
     if(!room || room.status!=='playing')return;
-    if(!room.fuseEndsAt){$('timerValue').textContent='--.-';$('timerFill').style.width='0%';return;}
+    if(!room.fuseEndsAt){$('timerValue').textContent='--.-';$('arena').style.setProperty('--time-arc','0deg');return;}
     const remaining=Math.max(0,(room.fuseEndsAt-(Date.now()+state.clockSkew))/1000);
     $('timerValue').textContent=remaining.toFixed(1);
     const fraction=Math.max(0,Math.min(1,remaining*1000/Math.max(1,room.fuseDurationMs||1000)));
-    $('timerFill').style.width=`${fraction*100}%`;
+    $('arena').style.setProperty('--time-arc',`${fraction*360}deg`);
     $('timerDisplay').classList.toggle('urgent',remaining<=5);
     $('timerDisplay').classList.toggle('critical',remaining<=2);
   }
@@ -439,7 +435,7 @@
     if(token){
       state.wasMyTurn=false;
       socket.timeout(6000).emit('resumeRoom',{code,sessionToken:token},(err,res)=>{
-        if(!err&&res?.ok){rememberSession(res);onRestoredRoom(code);toast('رجعت لمكانك باللعبة! 🐡');return;}
+        if(!err&&res?.ok){rememberSession(res);onRestoredRoom(code);toast('رجعت لمكانك باللعبة! 💣');return;}
         clearSession(code);
         if(state.room){state.room=null;state.wasMyTurn=false;switchScreen(pendingInviteCode?'invite':'home');}
         if(pendingInviteCode){
@@ -467,7 +463,7 @@
     const bubble=node('div','floating-reaction',event.emoji);seat.append(bubble);
     setTimeout(()=>bubble.remove(),2800);
   });
-  const REACTION_SET=new Set(['👏','😂','😱','💀','🔥','🐡']);
+  const REACTION_SET=new Set(['👏','😂','😱','💀','🔥','💣']);
   $('username').value=state.name;
   $('inviteName').value=state.name;
   if(pendingInviteCode) {

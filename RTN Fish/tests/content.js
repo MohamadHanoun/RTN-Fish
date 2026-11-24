@@ -81,7 +81,7 @@ assert(app.includes('room.usedCount ?? room.usedAnswers.length'), 'progress must
 assert(!html.includes('id="maxPlayers"') && !html.includes('id="hostMaxPlayers"'),'player count must be automatic');
 assert(html.includes('id="timerValue"') && app.includes('updateCountdown()'),'all players should see the countdown');
 assert(html.includes('id="arenaPlayers"') && app.includes('arena-last-word'),'players need their latest words beside their seats');
-assert(css.includes('/underwater.svg'),'underwater artwork must be loaded');
+assert(html.includes('class="clock-arena"') && html.includes('/arena.js') && app.includes('--time-arc'), 'arena must render player models and the live timer ring');
 assert(css.includes('[hidden]{display:none!important}'),'hidden host-only and turn controls must stay invisible');
 for(const [prompt,english,arabic] of [
   ['اذكر فاكهة','dragon fruit','فاكهة التنين'],

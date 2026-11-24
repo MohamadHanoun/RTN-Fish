@@ -337,3 +337,35 @@ body.in-game main{max-width:none;padding:0;margin:0;width:100%}
 @media(max-width:520px){.reaction-buttons button{font-size:22px;height:43px}.final-awards{gap:5px}.award-tile{padding:11px 4px}.award-tile strong{font-size:12px}.award-tile>span:not(.award-icon){font-size:11px}}
 @media(prefers-reduced-motion:reduce){.floating-reaction{animation:none}}
 [hidden]{display:none!important}
+
+/* Flat clock face with an independent transparent layer for the seated models. */
+:root{--bg:#141114;--panel:#251e21;--panel2:#30262a;--aqua:#ff988b;--mint:#ed514c;--muted:#c7b8ba;--border:#594347}
+body:before{background:radial-gradient(ellipse at top left,#432329,transparent 65%)}
+.topbar,.in-game .topbar,.game-sidebar{background:#191519;border-color:#513c41}
+.card,.room-code-panel,.entry-card,.hero-panel,.game-sidebar .card{background:linear-gradient(145deg,#30262a,#1c181b);border-color:#49383d}
+.hero-panel em,.huge-code,.card-eyebrow,.logo small,.hero-panel .eyebrow,.answer-tools button{color:#ff9589}
+.btn.primary,.holder-chip.mine{background:#ae302d;color:#fff;border-color:#e45d51;box-shadow:0 4px 18px #68171540}
+.btn.primary:hover{background:#c53c35}
+.game-grid .game-card,.game-grid .game-card.danger{height:auto;min-height:calc(100dvh - 64px);background:radial-gradient(ellipse at center,#38272c,#191418 70%);justify-content:center;gap:6px}
+.game-card:before,.game-card:after{background:none}
+.game-card .clock-arena{--time-arc:0deg;position:relative;isolation:isolate;flex:none;width:min(98%,clamp(260px,calc(100dvh - 344px),750px));aspect-ratio:1;margin:8px auto;background:radial-gradient(circle,#291f23 0 19%,#ad3c37 19.2% 19.6%,#382c30 19.8% 32%,#744b51 32.2% 32.6%,#31272a 32.8% 54%,#3c2c30 65%);border-radius:50%;box-shadow:0 0 0 2px #a97766,0 10px 38px #0009}
+.clock-face,.clock-face:before,.clock-face:after,#models,#arenaPlayers{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.clock-face:before,.clock-face:after{content:'';border-radius:50%}
+.clock-face:before{background:conic-gradient(#ff6053 var(--time-arc),#584044 0);mask:radial-gradient(closest-side,transparent 95%,black 96%)}
+.clock-face:after{inset:4%;width:92%;height:92%;background:repeating-conic-gradient(from -1deg,#ba8379 0 1deg,transparent 1deg 6deg);mask:radial-gradient(closest-side,transparent 96%,black 96%)}
+.clock-readout{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.05;color:#f7e6df;font-variant-numeric:tabular-nums}
+.clock-readout strong{font:800 clamp(19px,3.3vw,44px)/1.05 system-ui;letter-spacing:-.06em}
+.clock-readout small{font:700 clamp(9px,1.1vw,15px)/1.2 monospace;letter-spacing:.08em;color:#ff9c90}
+.clock-readout span{font-size:10px;color:#d8babb}.clock-readout.urgent strong{color:#ff8274}
+.clock-seat{position:absolute;transform:translate(-50%,30%);display:flex;align-items:center;justify-content:center;gap:3px;max-width:20%;background:#21181bed;border:1px solid #715757;border-radius:6px;padding:1px 4px;font:600 clamp(9px,1vw,13px)/1.35 Tahoma,sans-serif;color:white}
+.clock-seat.on-turn{border-color:#ffaf91;background:#862b29}.clock-seat.eliminated,.clock-seat.disconnected{opacity:.65}
+.clock-seat .arena-player-name,.clock-seat .arena-player-hearts{position:static;background:none;color:inherit;font:inherit;min-width:0;padding:0;margin:0;white-space:nowrap}
+.clock-seat .arena-player-name{overflow:hidden;text-overflow:ellipsis}
+.clock-seat .arena-turn-label,.clock-seat .arena-turn-star{display:none}
+.clock-seat .arena-last-word{position:absolute;top:100%;bottom:auto;margin-top:1px;left:50%;transform:translateX(-50%);border:none;background:#231c20ed;color:#ebcabe;max-width:90px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clock-arena.is-exploding .clock-face{filter:brightness(1.85)}
+.hero-clock{position:relative;display:grid;place-content:center;margin:24px 0;width:clamp(110px,23vw,215px);aspect-ratio:1;border:3px solid #b8524b;border-radius:50%;background:repeating-conic-gradient(#a97169 0 1deg,transparent 1deg 12deg),#302328;box-shadow:0 12px 36px #110b0e}
+.hero-clock i{position:absolute;inset:6%;border-radius:50%;background:radial-gradient(ellipse at 32% 24%,#83696a,#352d32 27%,#151317 61%,#5b3033);border:3px solid #673738}
+.hero-clock b{position:relative;color:#ffe6de;font:900 clamp(18px,3vw,35px)/1 system-ui}
+.game-status-row .holder-chip,.answer-dock,.game-player,.reaction-buttons button,.award-tile,.question-topline .prompt-kicker{background-color:#312429;border-color:#604347}
+@media(max-width:700px){.game-card .clock-arena{width:min(94%,520px);margin:12px auto 18px}.game-grid .game-card{min-height:0;padding-bottom:16px}.clock-seat{max-width:22%}}

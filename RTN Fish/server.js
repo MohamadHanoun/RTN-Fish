@@ -10,7 +10,7 @@ const socketRoom = new Map();
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MIN_TIME = 6, MAX_TIME = 90, MAX_HEARTS = 10;
 const RECONNECT_GRACE_MS = Math.max(500,Math.min(120_000,Number(process.env.RECONNECT_GRACE_MS)||45_000));
-const REACTIONS = new Set(['👏','😂','😱','💀','🔥','🐡']);
+const REACTIONS = new Set(['👏','😂','😱','💀','🔥','🐡','💣']);
 const AVATARS = Object.freeze(['dog','wolf','fox','cat','bear','rabbit','lion','panda','tiger','owl','koala','raccoon']);
 
 function chooseAvatar(players = []) {
@@ -163,7 +163,7 @@ function explode(code) {
   holder.explosions++;
   room.questionExplosions++;
   clearFuse(room);
-  emitFeed(room,'pop',`انفجرت السمكة عند ${holder.name} وخسر قلب!`);
+  emitFeed(room,'pop',`انفجرت القنبلة عند ${holder.name} وخسر قلب!`);
   if(activePlayers(room).length<=1) return endGame(room);
   const next=nextActive(room,holder.id);
   if(advanceAfterExplosion(room.used.size,room.answerGoal,room.questionExplosions)) {

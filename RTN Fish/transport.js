@@ -37,8 +37,11 @@ function createTransport() {
     let requested;
     try { requested = decodeURIComponent(req.url.split('?')[0]); } catch (_e) { res.writeHead(400);return res.end('Bad Request'); }
     if (requested === '/') requested = '/index.html';
-    const full = path.resolve(PUBLIC, `.${requested}`);
-    if (!full.startsWith(PUBLIC + path.sep)) {res.writeHead(403);return res.end('Forbidden');}
+    const isThreeModule = requested === '/vendor/three.module.js';
+    const full = isThreeModule
+      ? path.join(path.dirname(require.resolve('three')), 'three.module.min.js')
+      : path.resolve(PUBLIC, `.${requested}`);
+    if (!isThreeModule && !full.startsWith(PUBLIC + path.sep)) {res.writeHead(403);return res.end('Forbidden');}
     fs.stat(full, (err,stats) => {
       if (err || !stats.isFile()) {res.writeHead(404);return res.end('Not Found');}
       res.setHeader('Content-Type', MIME[path.extname(full)] || 'application/octet-stream');
