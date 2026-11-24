@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const socket = io({ reconnectionAttempts: 10 });
   const state = { room: null, name: localStorage.getItem('samaka-name') || '', screen: 'home', sound: localStorage.getItem('samaka-muted') !== 'yes', wasMyTurn: false, lastFeedSeq: -1, clockSkew: 0 };
-  let toastTimeout = null, feedbackTimeout = null, actx = null, previewTimer = null, previewSeq = 0;
+  let toastTimeout = null, feedbackTimeout = null, previewTimer = null, previewSeq = 0;
   const roomFromLink = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
   let pendingInviteCode = /^[A-Z]{4}$/.test(roomFromLink || '') ? roomFromLink : null;
   let inviteJoining = false, inviteAutoAttempted = false;
@@ -17,21 +17,12 @@
   // Always show Western digits (0–9), even if the browser uses an Arabic locale.
   const numberFormatter = new Intl.NumberFormat('en-US-u-nu-latn');
   const formatNumber = n => numberFormatter.format(Number(n || 0));
-  function beep(kind = 'pass') {
-    if (!state.sound) return;
-    try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      const osc = actx.createOscillator(); const gain = actx.createGain();
-      osc.connect(gain); gain.connect(actx.destination);
-      osc.type = kind === 'pop' || kind === 'wrong' ? 'sawtooth' : 'sine';
-      osc.frequency.setValueAtTime(kind === 'pop' ? 180 : kind === 'wrong' ? 270 : kind === 'win' ? 520 : 560, actx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(kind === 'pop' || kind === 'wrong' ? 95 : 820, actx.currentTime + .16);
-      gain.gain.setValueAtTime(.0001, actx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.045, actx.currentTime + .025);
-      gain.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + .19);
-      osc.start();osc.stop(actx.currentTime + .2);
-    } catch (_e) { /* browser may block autoplay */ }
-  }
+  const audio = createGameAudio(() => new (window.AudioContext || window.webkitAudioContext)());
+  let tickDeadline, lastSecond;
+  function unlockSound() { if (state.sound) audio.unlock(); }
+  document.addEventListener('pointerdown', unlockSound);
+  document.addEventListener('keydown', unlockSound);
+  function beep(kind) { if (state.sound && !document.hidden) audio.play(kind); }
   function toast(message) {
     const element = $('toast');
     element.textContent = message;
@@ -75,7 +66,7 @@
     room.players.forEach((p,i) => {
       const angle = Math.PI/2 + (2*Math.PI*(i-anchorIndex)/Math.max(count,1));
       // Keep bottom seats and their last-word bubbles above the answer dock.
-      const x = 50 + 38*Math.cos(angle), y = 50 + 38*Math.sin(angle);
+      const x = Math.max(10,Math.min(90,50 + 44*Math.cos(angle))), y = 50 + 44*Math.sin(angle);
       const current = p.id === room.currentPlayerId;
       let seat = existing.get(p.id);
       if(!seat) {
@@ -309,6 +300,11 @@
     if(!room || room.status!=='playing')return;
     if(!room.fuseEndsAt){$('timerValue').textContent='--.-';$('arena').style.setProperty('--time-arc','0deg');return;}
     const remaining=Math.max(0,(room.fuseEndsAt-(Date.now()+state.clockSkew))/1000);
+    const second=Math.ceil(remaining);
+    const cue=countdownCue(second, room.fuseEndsAt===tickDeadline ? lastSecond : null);
+    if(cue && room.currentPlayerId===socket.id) beep(cue);
+    tickDeadline=room.fuseEndsAt;
+    lastSecond=second;
     $('timerValue').textContent=remaining.toFixed(1);
     const fraction=Math.max(0,Math.min(1,remaining*1000/Math.max(1,room.fuseDurationMs||1000)));
     $('arena').style.setProperty('--time-arc',`${fraction*360}deg`);
@@ -344,13 +340,14 @@
       $('finalScores').append(row);
     });
     $('rematchBtn').hidden = room.hostId !== socket.id;
-    if (state.screen !== 'ended') beep('win');
+
   }
   function onState(room) {
     if(state.room?.code!==room.code)state.lastFeedSeq=-1;
     state.room = room;
     if(Number.isFinite(room.serverNow)) state.clockSkew=room.serverNow-Date.now();
     const screen = room.status === 'playing' ? 'game' : room.status === 'ended' ? 'ended' : 'lobby';
+    if(screen==='ended' && state.screen==='game') beep('win');
     switchScreen(screen);
     if (screen === 'lobby') updateLobby(room);
     if (screen === 'game') updateGame(room);
@@ -419,6 +416,7 @@
     request('submitAnswer', {answer}, ({answer:value, points, heartsGained, gainedTime, rarityLabel, correction}) => {
       $('answerInput').value = '';
       clearPreview();
+      beep('correct');
       feedback(`${correction === 'exact' ? 'ممتاز!' : 'خمّنا جوابك!'} ${value} — ${rarityLabel} (+${formatNumber(points)} نقطة)${heartsGained ? ` +${formatNumber(heartsGained)} قلب!` : ''}${gainedTime ? ` +${formatNumber(gainedTime)} ثواني للمستقبل!` : ''}`, 'success');
     },showAnswerError);
   }
@@ -505,9 +503,14 @@
   $('soundBtn').addEventListener('click',()=>{
     state.sound=!state.sound;
     localStorage.setItem('samaka-muted',state.sound?'no':'yes');
+    if(state.sound){ audio.unlock(); beep('pass'); } else audio.mute();
+    renderSoundButton();
+  });
+  function renderSoundButton(){
     $('soundBtn').classList.toggle('off',!state.sound);
     $('soundBtn').textContent=state.sound?'♫':'♩';
-  });
-  $('soundBtn').classList.toggle('off',!state.sound);
+    $('soundBtn').setAttribute('aria-pressed',String(state.sound));
+  }
+  renderSoundButton();
   setInterval(updateCountdown,100);
 })();

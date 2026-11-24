@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#171317" />
   <meta name="description" content="تيك تاك | tik tak — لعبة أسئلة وتحديات عربية أونلاين. جاوب ومرّر القنبلة قبل الانفجار!" />
   <title>تيك تاك | tik tak | لعبة جماعية أونلاين</title>
@@ -67,13 +67,13 @@
       <div class="page-head game-head"><div><div class="eyebrow"><bdi>تيك تاك | tik tak</bdi> <span class="sep">/</span> <span id="roundLabel">السؤال 1</span></div><h2 id="gameHeadline">الجواب عندك!</h2></div><button class="btn ghost leave-btn">خروج</button></div>
       <div class="game-grid"><div class="game-card card"><div class="question-topline"><span class="prompt-kicker" id="gameCategory">جولة جديدة</span><span class="round-marker">● tik tak</span></div><div id="gameQuestion" class="big-question">اذكر فاكهة</div>
         <div class="game-status-row"><div class="holder-chip" id="holderChip">انتظر دورك</div></div>
-        <div id="arena" class="clock-arena" aria-label="ساعة الدور وساحة اللاعبين">
+        <div class="arena-space"><div id="arena" class="clock-arena" aria-label="ساعة الدور وساحة اللاعبين">
           <div class="clock-face"></div>
           <div class="clock-readout" id="timerDisplay"><small>tik tak</small><strong id="timerValue" dir="ltr">--.-</strong><span>ثانية</span></div>
           <canvas id="models" aria-hidden="true"></canvas>
           <div id="arenaPlayers"></div>
         </div>
-        <div class="answer-dock"><form id="answerForm" class="answer-form"><input id="answerInput" type="text" maxlength="70" placeholder="إجابة بالعربي أو English…" autocomplete="off" spellcheck="false" enterkeyhint="send" disabled /><button class="btn primary" id="answerBtn" type="submit" disabled>جاوب ومرّر <span>←</span></button></form><div class="answer-suggestion" id="answerSuggestion" aria-live="polite"></div><div class="answer-feedback" id="answerFeedback" role="status" aria-live="assertive"> </div><div class="answer-tools"><button id="suggestBtn" type="button">✎ اقترح إجابة ناقصة</button><span id="suggestStatus" role="status" aria-live="polite"></span></div></div>
+        </div><div class="answer-dock"><form id="answerForm" class="answer-form"><input id="answerInput" type="text" maxlength="70" placeholder="إجابة بالعربي أو English…" autocomplete="off" spellcheck="false" enterkeyhint="send" disabled /><button class="btn primary" id="answerBtn" type="submit" disabled>جاوب ومرّر <span>←</span></button></form><div class="answer-suggestion" id="answerSuggestion" aria-live="polite"></div><div class="answer-feedback" id="answerFeedback" role="status" aria-live="assertive"> </div><div class="answer-tools"><button id="suggestBtn" type="button">✎ اقترح إجابة ناقصة</button><span id="suggestStatus" role="status" aria-live="polite"></span></div></div>
       </div><aside class="game-sidebar"><div class="card sidebar-card"><div class="players-heading"><h3>اللاعبون</h3><span id="gameCount">0 لاعبين</span></div><div id="gamePlayerList" class="game-player-list"></div></div><div class="card history-card"><div class="players-heading"><h3>الإجابات</h3><span id="usedCount">0 / 0</span></div><div id="usedList" class="chips"><span class="muted">لسه ما في إجابات</span></div></div><div class="card reactions-card"><div class="players-heading"><h3>تفاعلات سريعة</h3><span>للجميع</span></div><div id="reactionButtons" class="reaction-buttons"><button type="button" data-emoji="👏" aria-label="تصفيق">👏</button><button type="button" data-emoji="😂" aria-label="ضحك">😂</button><button type="button" data-emoji="😱" aria-label="مفاجأة">😱</button><button type="button" data-emoji="💀" aria-label="موت من الضحك">💀</button><button type="button" data-emoji="🔥" aria-label="نار">🔥</button><button type="button" data-emoji="💣" aria-label="قنبلة">💣</button></div></div><div class="activity" id="activityText"> </div></aside></div>
     </section>
     <section id="ended" class="screen finished-screen"><div class="card result-card"><div class="trophy">✦</div><div id="winnerAvatar" class="winner-avatar"></div><div class="eyebrow">نهاية اللعبة</div><h2 id="winnerName">لدينا فائز!</h2><p class="muted" id="winnerSubtitle">انتهت المنافسة، والجولة القادمة بانتظاركم.</p><div id="finalAwards" class="final-awards"></div><div id="finalScores" class="final-scores"></div><button id="rematchBtn" class="btn primary">العبوا مرة ثانية <span>↻</span></button><button class="btn ghost leave-btn">مغادرة الغرفة</button></div></section>
@@ -81,6 +81,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/ws-adapter.js"></script>
   <script src="/animals.js"></script>
+  <script src="/sound.js"></script>
   <script src="/app.js"></script>
   <script type="module">
     const loadArena = () => import('/arena.js');

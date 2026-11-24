@@ -63,11 +63,11 @@ function makeScene(canvas) {
     obj(p, new T.TorusGeometry(r, t, 8, 48), m, x, y, z);
   const graphite = standard(0x191a20, 0.41, 0.58),
     rubber = standard(0x19171b, 0, 0.85),
-    scarlet = standard(0xa72b30, 0.44, 0.36),
+    scarlet = standard(0xce3f39, 0.44, 0.33),
     trim = standard(0x715a60, 0.77, 0.34),
     hot = lit(0xff4031),
     spark = lit(0xffbf6c),
-    cloth = standard(0x606069, 0.05, 0.86),
+    cloth = standard(0x939099, 0.10, 0.72),
     visor = standard(0x151922, 0.83, 0.15);
 
   scene.add(new T.HemisphereLight(0xffe6da, 0x8a7782, 1.55));
@@ -132,12 +132,17 @@ function makeScene(canvas) {
     const head = ball(
       body,
       0.345,
-      standard(0xa39899, 0.3, 0.47),
+      standard(0xc9b8b0, 0.32, 0.39),
       0,
       1.97,
       -0.02,
     );
     head.scale.set(0.91, 1, 0.91);
+    // A painted crown stripe stays visible from the overhead camera.
+    const colors = [0xf68466, 0x80bec5, 0xe6b45d, 0xb193c5, 0xa9b974];
+    const paint = standard(colors[(chairs.length - 1) % colors.length], 0.2, 0.45);
+    const stripe = ball(body, 0.30, paint, 0, 2.05, -0.035);
+    stripe.scale.set(0.19, 0.90, 0.95);
     let face = ball(body, 0.29, visor, 0, 1.96, 0.115);
     face.scale.set(1, 0.54, 0.77);
     box(body, 0.22, 0.026, 0.037, hot, 0, 1.98, 0.329);
@@ -165,7 +170,7 @@ function makeScene(canvas) {
     }
     const halo = horizontal(chair, 0.84, 0.042, hot, 0.078);
     lamps.push(halo);
-    chair.rotation.x = 0.26;
+    chair.rotation.x = -0.29;
   }
   const ballRoot = group(base),
     rolling = group(ballRoot),

@@ -1,13 +1,13 @@
 {
   "name": "tik-tak",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "private": true,
   "type": "commonjs",
   "description": "تيك تاك | tik tak — Arabic multiplayer party game",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node tests/knowledge-v3.js && node tests/knowledge-v4.js && node tests/knowledge-v4-wordnet.js && node tests/knowledge-v43.js && node tests/knowledge-v44-alias.js && node tests/knowledge-v44-land.js && node tests/knowledge-v45.js && node tests/matcher-safety.js && node tests/content.js && node tests/arena.mjs && node tests/client-adapter.js && node tests/integration.js"
+    "test": "node tests/knowledge-v3.js && node tests/knowledge-v4.js && node tests/knowledge-v4-wordnet.js && node tests/knowledge-v43.js && node tests/knowledge-v44-alias.js && node tests/knowledge-v44-land.js && node tests/knowledge-v45.js && node tests/matcher-safety.js && node tests/content.js && node tests/arena.mjs && node tests/sound.js && node tests/client-adapter.js && node tests/integration.js"
   },
   "engines": {
     "node": ">=18"
